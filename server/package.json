@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node -r dotenv/config server.js",
-    "dev": "NODE_ENV=development node -r dotenv/config server.js",
+    "dev": "nodemon -r dotenv/config --watch . --ext js server.js",
     "prod": "NODE_ENV=production node -r dotenv/config server.js",
     "build": "echo \"Building server\" && npm install",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -22,5 +22,8 @@
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.14.1",
     "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
   }
 }

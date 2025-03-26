@@ -24,6 +24,17 @@ app.get('/api/status', (req, res) => {
   });
 });
 
+// Add a root route for browser testing
+app.get('/', (req, res) => {
+  res.send(`
+    <h1>Smiya Server</h1>
+    <p>Status: Running</p>
+    <p>Environment: ${NODE_ENV}</p>
+    <p>Timestamp: ${new Date().toISOString()}</p>
+    <p><a href="/api/status">API Status (JSON)</a></p>
+  `);
+});
+
 // Database Test
 pool.query('SELECT NOW()', (err) => {
   if (err) console.error('DB Connection Error:', err);
@@ -32,6 +43,10 @@ pool.query('SELECT NOW()', (err) => {
 
 // Socket.io Setup
 const server = app.listen(PORT, () => {
+  const localUrl = `http://localhost:${PORT}`;
   console.log(`Server running on port ${PORT} in ${NODE_ENV} mode`);
+  console.log(`📡 API Status: ${localUrl}/api/status`);
+  // Terminal clickable link (works in most modern terminals)
+  console.log(`🚀 Server: \x1b[36m${localUrl}\x1b[0m`);
 });
 initSockets(server);
