@@ -1,0 +1,105 @@
+/* Friends page styling */
+.friends-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.error-message {
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.error-message button {
+  background-color: #c62828;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.search-section {
+  margin-bottom: 30px;
+  background-color: #f5f5f5;
+  padding: 15px;
+  border-radius: 8px;
+}
+
+.search-bar {
+  display: flex;
+  margin-bottom: 15px;
+}
+
+.search-bar input {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-right: 10px;
+}
+
+.search-bar button {
+  background-color: #2196f3;
+  color: white;
+  border: none;
+  padding: 0 20px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.search-bar button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.user-card, .friend-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  border-bottom: 1px solid #eee;
+  background-color: white;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.user-info, .friend-info {
+  flex: 1;
+}
+
+.user-info h3, .friend-info h3 {
+  margin: 0 0 5px 0;
+}
+
+.user-info p, .friend-info p {
+  margin: 0;
+  color: #757575;
+}
+
+.user-card button, .friend-card button {
+  background-color: #2196f3;
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.user-card button.sent {
+  background-color: #81c784;
+  cursor: default;
+}
+
+.friends-list {
+  background-color: #f5f5f5;
+  padding: 15px;
+  border-radius: 8px;
+}

@@ -1,34 +1,39 @@
 import express from 'express';
 import cors from 'cors';
-import { initSockets } from './sockets/messaging.js';
 import { pool } from './config/db.js';
-// No need to import dotenv here as it's already loaded in db.js
+import { initSockets } from './sockets/messaging.js';
+import { initializeDatabase } from './config/schema.js';
+import authRoutes from './routes/authRoutes.js';
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
+const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(express.json());
 app.use(cors({
-  // Use more restrictive CORS in production
-  origin: NODE_ENV === 'production' ? process.env.ALLOWED_ORIGINS : '*'
+  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true
 }));
 
-// Add a basic route to check server status
+// Initialize database schema
+initializeDatabase().catch(console.error);
+
+// Routes
+app.use('/api/auth', authRoutes);
+
 app.get('/api/status', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'online',
     environment: NODE_ENV,
     timestamp: new Date().toISOString()
   });
 });
 
-// Add a root route for browser testing
 app.get('/', (req, res) => {
   res.send(`
-    <h1>Smiya Server</h1>
-    <p>Status: Running</p>
+    <h1>Smiya API Server</h1>
     <p>Environment: ${NODE_ENV}</p>
     <p>Timestamp: ${new Date().toISOString()}</p>
     <p><a href="/api/status">API Status (JSON)</a></p>
