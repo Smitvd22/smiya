@@ -4,6 +4,8 @@ import { pool } from './config/db.js';
 import { initSockets } from './sockets/messaging.js';
 import { initializeDatabase } from './config/schema.js';
 import authRoutes from './routes/authRoutes.js';
+import friendRoutes from './routes/friendRoutes.js';
+import userRoutes from './routes/userRoutes.js';
 
 const app = express();
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -22,6 +24,8 @@ initializeDatabase().catch(console.error);
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/friends', friendRoutes);
+app.use('/api/users', userRoutes);
 
 app.get('/api/status', (req, res) => {
   res.json({

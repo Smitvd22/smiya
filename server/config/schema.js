@@ -14,6 +14,18 @@ export const initializeDatabase = async () => {
       );
     `);
     
+    // Create friendships table if it doesn't exist
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS friendships (
+        id SERIAL PRIMARY KEY,
+        user1_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        user2_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'accepted', 'rejected')),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (user1_id, user2_id)
+      );
+    `);
+    
     console.log('Database schema initialized successfully');
   } catch (error) {
     console.error('Error initializing database schema:', error);

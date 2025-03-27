@@ -81,7 +81,7 @@ function Login() {
         </form>
         
         <div className="auth-footer">
-          Don't have an account? <Link to="/Register">Register</Link>
+          Don't have an account? <Link to="/register">Register</Link>
         </div>
       </div>
     </div>

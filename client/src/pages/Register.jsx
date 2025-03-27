@@ -62,7 +62,7 @@ function Register() {
       };
       
       // Show the full URL being used
-      const apiUrl = process.env.API_URL || 'http://localhost:5000/api';
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
       setDebugInfo(`Sending request to: ${apiUrl}/auth/register`);
       
       console.log('Registration data:', userData);
@@ -181,7 +181,7 @@ function Register() {
         </form>
         
         <div className="auth-footer">
-          Already have an account? <Link to="/Login">Log In</Link>
+          Already have an account? <Link to="/login">Log In</Link>
         </div>
       </div>
     </div>

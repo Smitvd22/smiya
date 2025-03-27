@@ -11,6 +11,9 @@ function Friends() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  
+  // Fix API URL to use REACT_APP prefix (required for React apps)
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
   // Memoize the fetchFriends function
   const fetchFriends = useCallback(async () => {
@@ -25,7 +28,6 @@ function Friends() {
         return;
       }
       
-      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
       console.log('Fetching friends from:', `${API_URL}/friends`);
       
       const response = await axios.get(`${API_URL}/friends`, {
@@ -38,14 +40,17 @@ function Friends() {
     } catch (err) {
       console.error('Error fetching friends:', err);
       setLoading(false);
-      setError(err.message || err.toString());
+      if (err.response?.status === 404) {
+        setError('Friend endpoint not found. Please check your API configuration.');
+      } else {
+        setError(err.response?.data?.error || err.message || 'An error occurred while fetching friends');
+      }
     }
-  }, [navigate]);  // Add navigate as a dependency
+  }, [navigate, API_URL]);
 
-  // Now use fetchFriends in useEffect
   useEffect(() => {
     fetchFriends();
-  }, [fetchFriends]);  // Add fetchFriends as a dependency
+  }, [fetchFriends]);
   
   const searchUsers = async () => {
     if (!searchTerm) return;
@@ -53,24 +58,37 @@ function Friends() {
     try {
       setLoading(true);
       const currentUser = getCurrentUser();
-      const API_URL = process.env.API_URL || 'https://smiya.onrender.com/api';
+      if (!currentUser || !currentUser.token) {
+        setError('You need to be logged in');
+        setLoading(false);
+        return;
+      }
       
       const response = await axios.get(`${API_URL}/users/search?q=${searchTerm}`, {
         headers: { Authorization: `Bearer ${currentUser.token}` }
       });
       
-      setSearchResults(response.data);
+      // Filter out users that are already friends
+      const filteredResults = response.data.filter(user => 
+        !friends.some(friend => friend.id === user.id)
+      );
+      
+      setSearchResults(filteredResults);
       setLoading(false);
     } catch (err) {
       setLoading(false);
-      setError(err.toString());
+      if (err.response?.status === 404) {
+        setError('User search endpoint not found. Please check your API configuration.');
+      } else {
+        setError(err.response?.data?.error || 'An error occurred while searching users');
+      }
     }
   };
   
   const sendFriendRequest = async (userId) => {
     try {
+      setLoading(true);
       const currentUser = getCurrentUser();
-      const API_URL = process.env.API_URL || 'https://smiya.onrender.com/api';
       
       await axios.post(`${API_URL}/friends/${userId}`, {}, {
         headers: { Authorization: `Bearer ${currentUser.token}` }
@@ -80,12 +98,35 @@ function Friends() {
       setSearchResults(searchResults.map(user => 
         user.id === userId ? {...user, requestSent: true} : user
       ));
+      setLoading(false);
+      
+      // Show a temporary success message
+      setError('Friend request sent successfully!');
+      setTimeout(() => setError(''), 3000);
     } catch (err) {
-      setError(err.toString());
+      setLoading(false);
+      setError(err.response?.data?.error || 'Failed to send friend request');
+    }
+  };
+  
+  const removeFriend = async (friendId) => {
+    try {
+      setLoading(true);
+      const currentUser = getCurrentUser();
+      
+      await axios.delete(`${API_URL}/friends/${friendId}`, {
+        headers: { Authorization: `Bearer ${currentUser.token}` }
+      });
+      
+      // Remove from friends list
+      setFriends(friends.filter(friend => friend.id !== friendId));
+      setLoading(false);
+    } catch (err) {
+      setLoading(false);
+      setError(err.response?.data?.error || 'Failed to remove friend');
     }
   };
 
-  // Add the missing function
   const startChat = (friendId) => {
     navigate(`/chat/${friendId}`);
   };
@@ -94,9 +135,11 @@ function Friends() {
     <div className="friends-container">
       <h1>Friends</h1>
       {error && (
-        <div className="error-message">
-          Error: {error}
-          <button onClick={() => window.location.reload()}>Try Again</button>
+        <div className={error.includes('successfully') ? "success-message" : "error-message"}>
+          {error.includes('successfully') ? '✓ ' : 'Error: '}{error}
+          {!error.includes('successfully') && (
+            <button onClick={() => window.location.reload()}>Try Again</button>
+          )}
         </div>
       )}
       
@@ -108,14 +151,15 @@ function Friends() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search by username or email"
+            onKeyPress={(e) => e.key === 'Enter' && searchUsers()}
           />
           <button onClick={searchUsers} disabled={loading || !searchTerm}>
-            Search
+            {loading ? 'Searching...' : 'Search'}
           </button>
         </div>
         
         {loading ? (
-          <p>Loading...</p>
+          <p className="loading">Searching for users...</p>
         ) : (
           <div className="search-results">
             {searchResults.length > 0 ? (
@@ -127,7 +171,7 @@ function Friends() {
                   </div>
                   <button 
                     onClick={() => sendFriendRequest(user.id)}
-                    disabled={user.requestSent}
+                    disabled={user.requestSent || loading}
                     className={user.requestSent ? "sent" : ""}
                   >
                     {user.requestSent ? "Request Sent" : "Add Friend"}
@@ -135,7 +179,7 @@ function Friends() {
                 </div>
               ))
             ) : searchTerm ? (
-              <p>No users found</p>
+              <p>No users found with that username</p>
             ) : null}
           </div>
         )}
@@ -144,7 +188,7 @@ function Friends() {
       <div className="friends-list">
         <h2>My Friends</h2>
         {loading ? (
-          <p>Loading...</p>
+          <p className="loading">Loading your friends...</p>
         ) : friends.length > 0 ? (
           friends.map(friend => (
             <div className="friend-card" key={friend.id}>
@@ -152,7 +196,20 @@ function Friends() {
                 <h3>{friend.username}</h3>
                 <p>{friend.email}</p>
               </div>
-              <button onClick={() => startChat(friend.id)}>Chat</button>
+              <div className="friend-actions">
+                <button 
+                  onClick={() => startChat(friend.id)}
+                  className="chat-btn"
+                >
+                  Chat
+                </button>
+                <button 
+                  onClick={() => removeFriend(friend.id)}
+                  className="remove-btn"
+                >
+                  Remove
+                </button>
+              </div>
             </div>
           ))
         ) : (
