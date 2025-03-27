@@ -10,6 +10,7 @@ function Friends() {
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [friendRequests, setFriendRequests] = useState([]);
   const navigate = useNavigate();
   
   // Fix API URL to use REACT_APP prefix (required for React apps)
@@ -48,9 +49,28 @@ function Friends() {
     }
   }, [navigate, API_URL]);
 
+  // Add function to fetch pending friend requests
+  const fetchFriendRequests = useCallback(async () => {
+    try {
+      const currentUser = getCurrentUser();
+      if (!currentUser || !currentUser.token) {
+        return;
+      }
+      
+      const response = await axios.get(`${API_URL}/friends/requests`, {
+        headers: { Authorization: `Bearer ${currentUser.token}` }
+      });
+      
+      setFriendRequests(response.data);
+    } catch (err) {
+      console.error('Error fetching friend requests:', err);
+    }
+  }, [API_URL]);
+
   useEffect(() => {
     fetchFriends();
-  }, [fetchFriends]);
+    fetchFriendRequests();
+  }, [fetchFriends, fetchFriendRequests]);
   
   const searchUsers = async () => {
     if (!searchTerm) return;
@@ -109,6 +129,48 @@ function Friends() {
     }
   };
   
+  const acceptFriendRequest = async (requestId) => {
+    try {
+      setLoading(true);
+      const currentUser = getCurrentUser();
+      
+      await axios.put(`${API_URL}/friends/requests/${requestId}/accept`, {}, {
+        headers: { Authorization: `Bearer ${currentUser.token}` }
+      });
+      
+      // Refresh both lists
+      await fetchFriendRequests();
+      await fetchFriends();
+      
+      setLoading(false);
+      setError('Friend request accepted successfully!');
+      setTimeout(() => setError(''), 3000);
+    } catch (err) {
+      setLoading(false);
+      setError(err.response?.data?.error || 'Failed to accept friend request');
+    }
+  };
+
+  const rejectFriendRequest = async (requestId) => {
+    try {
+      setLoading(true);
+      const currentUser = getCurrentUser();
+      
+      await axios.put(`${API_URL}/friends/requests/${requestId}/reject`, {}, {
+        headers: { Authorization: `Bearer ${currentUser.token}` }
+      });
+      
+      // Remove from requests list
+      setFriendRequests(friendRequests.filter(request => request.id !== requestId));
+      setLoading(false);
+      setError('Friend request rejected');
+      setTimeout(() => setError(''), 3000);
+    } catch (err) {
+      setLoading(false);
+      setError(err.response?.data?.error || 'Failed to reject friend request');
+    }
+  };
+
   const removeFriend = async (friendId) => {
     try {
       setLoading(true);
@@ -140,6 +202,39 @@ function Friends() {
           {!error.includes('successfully') && (
             <button onClick={() => window.location.reload()}>Try Again</button>
           )}
+        </div>
+      )}
+      
+      {/* Add Friend Requests Section */}
+      {friendRequests.length > 0 && (
+        <div className="requests-section">
+          <h2>Friend Requests</h2>
+          <div className="friend-requests">
+            {friendRequests.map(request => (
+              <div className="user-card" key={request.id}>
+                <div className="user-info">
+                  <h3>{request.username}</h3>
+                  <p>{request.email}</p>
+                </div>
+                <div className="request-actions">
+                  <button 
+                    onClick={() => acceptFriendRequest(request.id)}
+                    disabled={loading}
+                    className="accept-btn"
+                  >
+                    Accept
+                  </button>
+                  <button 
+                    onClick={() => rejectFriendRequest(request.id)}
+                    disabled={loading}
+                    className="reject-btn"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
       

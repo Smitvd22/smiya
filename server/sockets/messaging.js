@@ -1,19 +1,25 @@
 import { Server } from 'socket.io';
 
-export const initSockets = (server) => {
+export const initSockets = (server, app) => {
   const io = new Server(server, {
-    cors: { origin: '*' } // Allow all for testing
+    cors: { origin: '*' } // In production, set this to your frontend URL
   });
+  
+  // Make io available in routes
+  app.set('io', io);
 
   io.on('connection', (socket) => {
-    // Messaging
-    socket.on('message', (data) => {
-      io.emit('message', data); // Broadcast to all
+    console.log('User connected:', socket.id);
+    
+    // Join a specific chat room (for private messaging)
+    socket.on('join-room', (roomId) => {
+      socket.join(roomId);
+      console.log(`Socket ${socket.id} joined room: ${roomId}`);
     });
-
-    // WebRTC Signaling
-    socket.on('call-signal', (data) => {
-      socket.broadcast.emit('call-signal', data); // Relay signals
+    
+    // Handle disconnection
+    socket.on('disconnect', () => {
+      console.log('User disconnected:', socket.id);
     });
   });
 };

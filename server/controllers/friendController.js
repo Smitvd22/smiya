@@ -66,3 +66,77 @@ export const removeFriend = async (req, res) => {
     res.status(500).json({ error: 'Failed to remove friend' });
   }
 };
+
+// Get pending friend requests
+export const getFriendRequests = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT f.id, u.username, u.email, u.id as user_id 
+       FROM users u
+       JOIN friendships f ON u.id = f.user1_id
+       WHERE f.user2_id = $1 AND f.status = 'pending'`,
+      [req.user.userId]
+    );
+    
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error('Get friend requests error:', error);
+    res.status(500).json({ error: 'Failed to retrieve friend requests' });
+  }
+};
+
+// Accept a friend request
+export const acceptFriendRequest = async (req, res) => {
+  const { requestId } = req.params;
+  
+  try {
+    // First verify this request is for the current user
+    const request = await pool.query(
+      `SELECT * FROM friendships WHERE id = $1 AND user2_id = $2 AND status = 'pending'`,
+      [requestId, req.user.userId]
+    );
+    
+    if (request.rows.length === 0) {
+      return res.status(404).json({ error: 'Friend request not found' });
+    }
+    
+    // Update the friendship status
+    await pool.query(
+      `UPDATE friendships SET status = 'accepted', updated_at = NOW() WHERE id = $1`,
+      [requestId]
+    );
+    
+    res.status(200).json({ message: "Friend request accepted" });
+  } catch (error) {
+    console.error('Accept friend request error:', error);
+    res.status(500).json({ error: 'Failed to accept friend request' });
+  }
+};
+
+// Reject a friend request
+export const rejectFriendRequest = async (req, res) => {
+  const { requestId } = req.params;
+  
+  try {
+    // First verify this request is for the current user
+    const request = await pool.query(
+      `SELECT * FROM friendships WHERE id = $1 AND user2_id = $2 AND status = 'pending'`,
+      [requestId, req.user.userId]
+    );
+    
+    if (request.rows.length === 0) {
+      return res.status(404).json({ error: 'Friend request not found' });
+    }
+    
+    // Delete the friend request
+    await pool.query(
+      `DELETE FROM friendships WHERE id = $1`,
+      [requestId]
+    );
+    
+    res.status(200).json({ message: "Friend request rejected" });
+  } catch (error) {
+    console.error('Reject friend request error:', error);
+    res.status(500).json({ error: 'Failed to reject friend request' });
+  }
+};
