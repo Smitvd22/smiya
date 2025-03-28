@@ -29,13 +29,53 @@ function Chat() {
 
     const fetchFriendInfo = async () => {
       try {
-        const response = await axios.get(`${API_URL}/users/${friendId}`, {
-          headers: { Authorization: `Bearer ${currentUser.token}` }
-        });
-        setFriendInfo(response.data);
+        const currentUser = getCurrentUser();
+        
+        if (!currentUser || !currentUser.token) {
+          console.error("No valid user token found");
+          setError("Authentication error. Please login again.");
+          navigate('/login');
+          return;
+        }
+        
+        // Try to get friend info
+        console.log(`Fetching friend info for ID: ${friendId}`);
+        
+        try {
+          // Try the /users endpoint first
+          const response = await axios.get(`${API_URL}/users/${friendId}`, {
+            headers: { Authorization: `Bearer ${currentUser.token}` }
+          });
+          
+          if (response.data) {
+            console.log("Friend info from /users:", response.data);
+            setFriendInfo(response.data);
+          } else {
+            throw new Error("Empty response from users endpoint");
+          }
+        } catch (userErr) {
+          console.error("Error with /users endpoint:", userErr);
+          
+          // Fallback to /friends endpoint
+          console.log("Falling back to friends endpoint");
+          const friendsResponse = await axios.get(`${API_URL}/friends`, {
+            headers: { Authorization: `Bearer ${currentUser.token}` }
+          });
+          
+          // Find the friend by ID in the friends list
+          // Note: friendId is a string from URL params, so we need to parse it
+          const friend = friendsResponse.data.find(f => f.id === parseInt(friendId, 10));
+          
+          if (friend) {
+            console.log("Found friend in friends list:", friend);
+            setFriendInfo(friend);
+          } else {
+            throw new Error("Friend not found");
+          }
+        }
       } catch (err) {
         console.error('Error fetching friend info:', err);
-        setError('Could not load friend information');
+        setError('Could not load friend information. Please go back and try again.');
       }
     };
 
@@ -125,7 +165,14 @@ function Chat() {
         <button className="back-button" onClick={() => navigate('/friends')}>
           ← Back
         </button>
-        <h2>{friendInfo ? friendInfo.username : 'Loading...'}</h2>
+        <h2>
+          {friendInfo ? (
+            // Try different potential properties where the username might be
+            friendInfo.username || 
+            (friendInfo.user && friendInfo.user.username) || 
+            'Friend'
+          ) : 'Loading...'}
+        </h2>
       </div>
       
       {error && <div className="error-message">{error}</div>}

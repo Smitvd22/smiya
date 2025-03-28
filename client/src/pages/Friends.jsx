@@ -21,10 +21,22 @@ function Friends() {
     try {
       setLoading(true);
       const currentUser = getCurrentUser();
-      console.log('Current user:', currentUser);
-      if (!currentUser || !currentUser.token) {
-        console.error('Authentication issue: No valid user or token found');
+      console.log('Current user in fetchFriends:', currentUser);
+      
+      // More detailed check for authentication
+      if (!currentUser) {
+        console.error('Authentication issue: No user found');
         setError('You need to be logged in. Redirecting to login...');
+        setTimeout(() => navigate('/login'), 2000);
+        return;
+      }
+      
+      if (!currentUser.token) {
+        console.error('Authentication issue: No token found', currentUser);
+        // Try to log the raw localStorage value for debugging
+        const rawUser = localStorage.getItem('user');
+        console.log('Raw localStorage user value:', rawUser);
+        setError('Invalid authentication. Redirecting to login...');
         setTimeout(() => navigate('/login'), 2000);
         return;
       }
@@ -41,7 +53,14 @@ function Friends() {
     } catch (err) {
       console.error('Error fetching friends:', err);
       setLoading(false);
-      if (err.response?.status === 404) {
+      
+      // Better error handling
+      if (err.response?.status === 401) {
+        console.error('Unauthorized access. Token might be invalid or expired.');
+        localStorage.removeItem('user'); // Clear invalid authentication
+        setError('Your session has expired. Please login again.');
+        setTimeout(() => navigate('/login'), 2000);
+      } else if (err.response?.status === 404) {
         setError('Friend endpoint not found. Please check your API configuration.');
       } else {
         setError(err.response?.data?.error || err.message || 'An error occurred while fetching friends');

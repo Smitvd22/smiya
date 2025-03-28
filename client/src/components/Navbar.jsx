@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getCurrentUser, logout } from '../services/authService';
 import '../styles/Navbar.css';
 
@@ -7,29 +7,35 @@ const Navbar = () => {
   const [user, setUser] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
+  // Update user state when location changes or component mounts
   useEffect(() => {
-    // Check if user is logged in
-    try {
+    const updateUserState = () => {
       const currentUser = getCurrentUser();
-      if (currentUser) {
-        setUser(currentUser);
-      }
-    } catch (error) {
-      console.error("Error loading user data:", error);
-      // Don't set user if there's an error
-    }
-  }, []);
+      setUser(currentUser);
+    };
+    
+    // Initial check
+    updateUserState();
+    
+    // Add event listener for storage changes (for cross-tab login/logout)
+    const handleStorageChange = () => {
+      updateUserState();
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [location.pathname]);
 
   const handleLogout = () => {
-    try {
-      logout();
-      setUser(null);
-      setShowDropdown(false);
-      navigate('/');
-    } catch (error) {
-      console.error("Error during logout:", error);
-    }
+    logout();
+    setUser(null);
+    setShowDropdown(false);
+    navigate('/');
   };
 
   return (

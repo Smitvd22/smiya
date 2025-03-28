@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { login } from '../services/authService';
+import { login, getCurrentUser } from '../services/authService';
 import '../styles/Auth.css';
 
 function Login() {
@@ -12,11 +12,23 @@ function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Check if user was redirected after registration
+  // Check if user is already logged in
+  useEffect(() => {
+    const user = getCurrentUser();
+    if (user) {
+      // If already logged in, redirect to Friends page
+      navigate('/friends');
+    }
+  }, [navigate]);
+
+  // Check if user was redirected after registration or from a protected route
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get('registered') === 'true') {
       setSuccess('Registration successful! Please log in.');
+    }
+    if (params.get('from')) {
+      setError(`Please login to access ${params.get('from')}`);
     }
   }, [location]);
 
@@ -34,7 +46,10 @@ function Login() {
       setLoading(true);
       await login(identifier, password);
       setLoading(false);
-      navigate('/friends'); 
+      
+      // Get redirect URL from location state or default to friends page
+      const from = new URLSearchParams(location.search).get('from') || '/friends';
+      navigate(from);
     } catch (err) {
       setLoading(false);
       setError(err.toString());
