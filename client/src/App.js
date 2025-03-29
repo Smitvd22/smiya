@@ -10,6 +10,7 @@ import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import { getCurrentUser } from './services/authService';
 import { CallProvider } from './contexts/CallContext';
+import './utils/processPolyfill';
 import './App.css';
 
 function App() {

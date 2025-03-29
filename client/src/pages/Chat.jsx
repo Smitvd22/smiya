@@ -1,18 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import io from 'socket.io-client'; // Add this import
 import { getCurrentUser } from '../services/authService';
 import { useCall } from '../contexts/CallContext';
 import '../styles/Chat.css';
 
-// Outside the component
-const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
-
 function Chat() {
   const { friendId } = useParams();
   const navigate = useNavigate();
-  const { socket } = useCall();
+  const { socket } = useCall(); // Get socket from context
   
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState('');
@@ -49,10 +45,8 @@ function Chat() {
       }
       
       if (append) {
-        // Add older messages to the beginning
         setMessages(prev => [...fetchedMessages, ...prev]);
       } else {
-        // Replace all messages (initial load)
         setMessages(fetchedMessages);
       }
       
@@ -168,42 +162,46 @@ function Chat() {
     }
   }, [handleScroll]);
   
-  // Connect to socket.io with enhanced logging
+  // Join chat room when component mounts or friendId/socket changes
   useEffect(() => {
-    console.log('Setting up socket connection...');
+    if (!socket) return;
     
-    socket.current = io(SOCKET_URL);
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
     
     // Join chat room to receive messages
-    const roomId = [getCurrentUser().id, friendId].sort().join('-');
+    const roomId = [currentUser.id, friendId].sort().join('-');
     console.log(`Joining chat room: ${roomId}`);
-    socket.current.emit('join-room', roomId);
+    socket.emit('join-room', roomId);
     
-    // Join personal room for receiving calls
-    const userRoom = `user-${getCurrentUser().id}`;
-    console.log(`Joining user room: ${userRoom}`);
-    socket.current.emit('join-user-room', userRoom);
+  }, [friendId, socket]); // Both dependencies are needed
+  
+  // Listen for new messages
+  useEffect(() => {
+    if (!socket) return;
     
-    // Listen for incoming messages
-    socket.current.on('new-message', (message) => {
+    const handleNewMessage = (message) => {
       console.log('New message received:', message);
+      const currentUser = getCurrentUser();
+      if (!currentUser) return;
       
       // Only add message if it belongs to current conversation
       if (
-        (message.senderId === friendId && message.receiverId === getCurrentUser().id) || 
-        (message.senderId === getCurrentUser().id && message.receiverId === friendId)
+        (message.senderId === parseInt(friendId) && message.receiverId === currentUser.id) || 
+        (message.senderId === currentUser.id && message.receiverId === parseInt(friendId))
       ) {
         setMessages(prev => [...prev, message]);
       }
-    });
-    
-    return () => {
-      console.log('Cleaning up socket connection...');
-      if (socket.current) {
-        socket.current.disconnect();
-      }
     };
-  }, [friendId]); // Remove endCall dependency as it's not needed here
+    
+    // Add event listener
+    socket.on('new-message', handleNewMessage);
+    
+    // Remove event listener on cleanup
+    return () => {
+      socket.off('new-message', handleNewMessage);
+    };
+  }, [friendId, socket]); // Both dependencies are needed
   
   // Auto-scroll to bottom when new messages arrive from the current conversation
   useEffect(() => {

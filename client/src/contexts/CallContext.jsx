@@ -18,14 +18,27 @@ export function CallProvider({ children }) {
     if (!user) return;
     
     console.log('Initializing global socket connection');
+    
+    // Fix socket initialization with proper options
     const socketInstance = io(SOCKET_URL, {
-      reconnectionAttempts: 3,
-      timeout: 10000
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      timeout: 20000,
+      transports: ['websocket', 'polling'],
+      autoConnect: true
     });
     
     socketInstance.on('connect', () => {
       console.log('Socket connected');
       socketInstance.emit('join-user-room', `user-${user.id}`);
+    });
+    
+    socketInstance.on('disconnect', () => {
+      console.log('Socket disconnected');
+    });
+    
+    socketInstance.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
     });
     
     setSocket(socketInstance);
@@ -36,26 +49,34 @@ export function CallProvider({ children }) {
         socketInstance.disconnect();
       }
     };
-  }, []);
+  }, []); // No dependencies needed here
   
   // Listen for incoming calls
   useEffect(() => {
     if (!socket) return;
     
-    socket.on('incoming-call', (callData) => {
+    const handleIncomingCall = (callData) => {
       console.log('CallContext: Incoming call received', callData);
       setIncomingCall(callData);
-    });
+    };
+    
+    socket.on('incoming-call', handleIncomingCall);
     
     return () => {
-      socket.off('incoming-call');
+      socket.off('incoming-call', handleIncomingCall);
     };
   }, [socket]);
   
   const handleAcceptCall = (callData) => {
     console.log('CallContext: Accepting call', callData);
     setIncomingCall(null);
-    navigate('/videocall', { state: { callerInfo: callData } });
+    
+    // Navigate to video call page with caller info
+    navigate('/videocall', { 
+      state: { 
+        callerInfo: callData
+      } 
+    });
   };
   
   const handleRejectCall = (callData) => {
@@ -67,9 +88,14 @@ export function CallProvider({ children }) {
   };
   
   return (
-    <CallContext.Provider value={{ socket, joinChatRoom: (roomId) => {
-      if (socket) socket.emit('join-room', roomId);
-    }}}>
+    <CallContext.Provider 
+      value={{ 
+        socket, 
+        joinChatRoom: (roomId) => {
+          if (socket) socket.emit('join-room', roomId);
+        }
+      }}
+    >
       {children}
       {incomingCall && (
         <IncomingCallNotification 

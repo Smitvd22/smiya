@@ -34,10 +34,17 @@ function VideoCall() {
       connectionRef.current = null;
     }
     
+    // Make sure to stop all media tracks properly
     if (stream) {
       try {
         const tracks = stream.getTracks();
-        tracks.forEach(track => track.stop());
+        tracks.forEach(track => {
+          try {
+            track.stop();
+          } catch (err) {
+            console.error("Error stopping track:", err);
+          }
+        });
       } catch (err) {
         console.error("Error stopping tracks:", err);
       }
@@ -48,9 +55,10 @@ function VideoCall() {
   const endCallHandler = useCallback(() => {
     if (!isComponentMounted.current) return;
     
+    // First notify the other user about ending the call
     if (socketRef.current) {
-      const callRecipient = recipientId || callerInfo?.id;
-      if (callRecipient && callState === 'active') {
+      const callRecipient = recipientId || callerInfo?.from;
+      if (callRecipient && callState !== 'idle') {
         try {
           socketRef.current.emit('end-call', { 
             to: callRecipient
@@ -61,13 +69,19 @@ function VideoCall() {
       }
     }
     
+    // Clean up resources
     cleanupResources();
     
-    // Return to chat safely
-    if (isComponentMounted.current) {
-      navigate(-1);
-    }
-  }, [callState, recipientId, callerInfo, navigate, cleanupResources]);
+    // Set state to ensure UI updates properly
+    setCallState('idle');
+    
+    // Navigate back after a short delay to ensure cleanup is complete
+    setTimeout(() => {
+      if (isComponentMounted.current) {
+        navigate(-1);
+      }
+    }, 100);
+  }, [cleanupResources, recipientId, callerInfo, callState, navigate]);
 
   // Track component mount status
   useEffect(() => {
@@ -280,18 +294,71 @@ function VideoCall() {
   }, [callState, endCallHandler]);
 
   useEffect(() => {
+    // Check if connectionRef exists, not using it as a dependency
     if (connectionRef.current) {
       connectionRef.current.on('connect', () => setConnectionStatus('connected'));
       connectionRef.current.on('error', () => setConnectionStatus('error'));
       connectionRef.current.on('close', () => setConnectionStatus('disconnected'));
     }
-  }, [connectionRef.current]);
+    // Remove the unnecessary dependency
+  }, []); // Removed connectionRef.current from dependencies
 
   // Use the shared socket from context instead of creating a new one
   useEffect(() => {
     socketRef.current = socket;
     
     // Only set up event listeners if socket exists and isn't already set up
+    if (!socket) return;
+    
+    const handleCallAccepted = (signal) => {
+      console.log("Call accepted, establishing connection");
+      if (isComponentMounted.current) {
+        setCallState('active');
+        if (connectionRef.current) {
+          connectionRef.current.signal(signal);
+        }
+      }
+    };
+    
+    const handleCallRejected = () => {
+      if (isComponentMounted.current) {
+        setCallError('Call was declined');
+        const timer = setTimeout(() => {
+          if (isComponentMounted.current) {
+            endCallHandler();
+          }
+        }, 3000);
+        return () => clearTimeout(timer);
+      }
+    };
+    
+    const handleCallEnded = () => {
+      if (isComponentMounted.current && callState !== 'idle') {
+        setCallError('Call ended by other user');
+        const timer = setTimeout(() => {
+          if (isComponentMounted.current) {
+            endCallHandler();
+          }
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
+    };
+    
+    socket.on('call-accepted', handleCallAccepted);
+    socket.on('call-rejected', handleCallRejected);
+    socket.on('call-ended', handleCallEnded);
+    
+    return () => {
+      socket.off('call-accepted', handleCallAccepted);
+      socket.off('call-rejected', handleCallRejected);
+      socket.off('call-ended', handleCallEnded);
+    };
+  }, [socket, callState, endCallHandler]);
+
+  // Add this code at the appropriate place in the component
+
+  // In the call handling section
+  useEffect(() => {
     if (!socket) return;
     
     const handleCallAccepted = (signal) => {
