@@ -143,3 +143,22 @@ video {
   height: 100%;
   object-fit: cover;
 }
+
+/* Media queries for responsive design */
+@media (max-width: 768px) {
+  .videos-container {
+    flex-direction: column;
+  }
+  
+  .my-video {
+    width: 100px;
+    height: 150px;
+    bottom: 80px;
+    right: 10px;
+  }
+  
+  .user-video {
+    width: 100%;
+    height: auto;
+  }
+}

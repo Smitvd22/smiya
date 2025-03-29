@@ -1,14 +1,19 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import io from 'socket.io-client';
+import io from 'socket.io-client'; // Add this import
 import { getCurrentUser } from '../services/authService';
+import { useCall } from '../contexts/CallContext';
 import '../styles/Chat.css';
 
 // Outside the component
 const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
 
 function Chat() {
+  const { friendId } = useParams();
+  const navigate = useNavigate();
+  const { socket } = useCall();
+  
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState('');
   const [friendInfo, setFriendInfo] = useState(null);
@@ -20,9 +25,6 @@ function Chat() {
   
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
-  const socketRef = useRef(null);
-  const { friendId } = useParams();
-  const navigate = useNavigate();
   
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
   const MESSAGES_PER_PAGE = 20;
@@ -170,20 +172,20 @@ function Chat() {
   useEffect(() => {
     console.log('Setting up socket connection...');
     
-    socketRef.current = io(SOCKET_URL);
+    socket.current = io(SOCKET_URL);
     
     // Join chat room to receive messages
     const roomId = [getCurrentUser().id, friendId].sort().join('-');
     console.log(`Joining chat room: ${roomId}`);
-    socketRef.current.emit('join-room', roomId);
+    socket.current.emit('join-room', roomId);
     
     // Join personal room for receiving calls
     const userRoom = `user-${getCurrentUser().id}`;
     console.log(`Joining user room: ${userRoom}`);
-    socketRef.current.emit('join-user-room', userRoom);
+    socket.current.emit('join-user-room', userRoom);
     
     // Listen for incoming messages
-    socketRef.current.on('new-message', (message) => {
+    socket.current.on('new-message', (message) => {
       console.log('New message received:', message);
       
       // Only add message if it belongs to current conversation
@@ -197,8 +199,8 @@ function Chat() {
     
     return () => {
       console.log('Cleaning up socket connection...');
-      if (socketRef.current) {
-        socketRef.current.disconnect();
+      if (socket.current) {
+        socket.current.disconnect();
       }
     };
   }, [friendId]); // Remove endCall dependency as it's not needed here
@@ -245,13 +247,7 @@ function Chat() {
   const initiateCall = () => {
     console.log('Initiating call to friend ID:', friendId);
     
-    // Make sure the socket has joined the required rooms
-    const currentUser = getCurrentUser();
-    if (currentUser) {
-      socketRef.current.emit('join-user-room', `user-${currentUser.id}`);
-    }
-    
-    // Navigate to VideoCall page with recipient ID
+    // No need to set up a socket connection here as it's already handled by the context
     navigate('/videocall', { state: { recipientId: friendId } });
   };
   

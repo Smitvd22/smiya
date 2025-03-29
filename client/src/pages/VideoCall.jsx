@@ -2,23 +2,25 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { createPeer, getUserMedia } from '../utils/webrtc';
 import { getCurrentUser } from '../services/authService';
-import io from 'socket.io-client';
+import { useCall } from '../contexts/CallContext';
 import '../styles/VideoCall.css';
 
 function VideoCall() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { recipientId } = location.state || {};
+  const { socket } = useCall();
+  const { recipientId, callerInfo: locationCallerInfo } = location.state || {};
   
   const [stream, setStream] = useState(null);
   const [callState, setCallState] = useState('idle');
-  const [callerInfo, setCallerInfo] = useState(null);
+  const [callerInfo, setCallerInfo] = useState(locationCallerInfo || null);
   const [callError, setCallError] = useState('');
+  const [connectionStatus, setConnectionStatus] = useState('initializing');
   
   const myVideo = useRef(null);
   const userVideo = useRef(null);
   const connectionRef = useRef(null);
-  const socketRef = useRef(null);
+  const socketRef = useRef(socket);
   const isComponentMounted = useRef(true);
 
   // Cleanup function to be used throughout the component
@@ -97,61 +99,6 @@ function VideoCall() {
       return () => clearTimeout(timer);
     }
   }, [recipientId, callState, navigate]);
-
-  // Initialize socket connection
-  useEffect(() => {
-    let socketInstance = null;
-    
-    try {
-      const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
-      const currentUser = getCurrentUser();
-      
-      if (!currentUser) {
-        setCallError('Authentication required');
-        const timer = setTimeout(() => {
-          if (isComponentMounted.current) {
-            navigate('/login', { replace: true });
-          }
-        }, 2000);
-        return () => clearTimeout(timer);
-      }
-      
-      socketInstance = io(SOCKET_URL, {
-        reconnectionAttempts: 3,
-        timeout: 10000
-      });
-      socketRef.current = socketInstance;
-      
-      socketInstance.on('connect', () => {
-        console.log('Socket connected');
-        socketInstance.emit('join-user-room', `user-${currentUser.id}`);
-      });
-      
-      socketInstance.on('connect_error', (error) => {
-        console.error('Socket connection error:', error);
-        if (isComponentMounted.current) {
-          setCallError('Connection error. Please try again.');
-        }
-      });
-      
-      return () => {
-        if (socketInstance) {
-          try {
-            socketInstance.disconnect();
-          } catch (err) {
-            console.error("Error disconnecting socket:", err);
-          }
-        }
-        socketRef.current = null;
-      };
-    } catch (error) {
-      console.error('Socket initialization error:', error);
-      if (isComponentMounted.current) {
-        setCallError('Failed to initialize connection');
-      }
-      return () => {};
-    }
-  }, [navigate]);
 
   // Initialize media stream
   useEffect(() => {
@@ -332,6 +279,66 @@ function VideoCall() {
     };
   }, [callState, endCallHandler]);
 
+  useEffect(() => {
+    if (connectionRef.current) {
+      connectionRef.current.on('connect', () => setConnectionStatus('connected'));
+      connectionRef.current.on('error', () => setConnectionStatus('error'));
+      connectionRef.current.on('close', () => setConnectionStatus('disconnected'));
+    }
+  }, [connectionRef.current]);
+
+  // Use the shared socket from context instead of creating a new one
+  useEffect(() => {
+    socketRef.current = socket;
+    
+    // Only set up event listeners if socket exists and isn't already set up
+    if (!socket) return;
+    
+    const handleCallAccepted = (signal) => {
+      console.log("Call accepted, establishing connection");
+      if (isComponentMounted.current) {
+        setCallState('active');
+        if (connectionRef.current) {
+          connectionRef.current.signal(signal);
+        }
+      }
+    };
+    
+    const handleCallRejected = () => {
+      if (isComponentMounted.current) {
+        setCallError('Call was declined');
+        const timer = setTimeout(() => {
+          if (isComponentMounted.current) {
+            endCallHandler();
+          }
+        }, 3000);
+        return () => clearTimeout(timer);
+      }
+    };
+    
+    const handleCallEnded = () => {
+      if (isComponentMounted.current && callState !== 'idle') {
+        setCallError('Call ended by other user');
+        const timer = setTimeout(() => {
+          if (isComponentMounted.current) {
+            endCallHandler();
+          }
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
+    };
+    
+    socket.on('call-accepted', handleCallAccepted);
+    socket.on('call-rejected', handleCallRejected);
+    socket.on('call-ended', handleCallEnded);
+    
+    return () => {
+      socket.off('call-accepted', handleCallAccepted);
+      socket.off('call-rejected', handleCallRejected);
+      socket.off('call-ended', handleCallEnded);
+    };
+  }, [socket, callState, endCallHandler]);
+
   const answerCall = () => {
     if (!stream) {
       setCallError("No camera access");
@@ -457,6 +464,9 @@ function VideoCall() {
           </button>
         </div>
       )}
+
+      {connectionStatus === 'connected' && <div className="connection-indicator connected">Connected</div>}
+      {connectionStatus === 'error' && <div className="connection-indicator error">Connection error</div>}
     </div>
   );
 }

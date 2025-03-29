@@ -9,6 +9,7 @@ import VideoCall from './pages/VideoCall';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import { getCurrentUser } from './services/authService';
+import { CallProvider } from './contexts/CallContext';
 import './App.css';
 
 function App() {
@@ -20,50 +21,52 @@ function App() {
   
   return (  
     <Router>
-      <div className="App">
-        <Navbar />
-        <Routes>
-          {/* Public routes */}
-          <Route path="/" element={<Home />} />
-          <Route 
-            path="/login" 
-            element={isAuthenticated() ? <Navigate to="/friends" /> : <Login />} 
-          />
-          <Route 
-            path="/register" 
-            element={isAuthenticated() ? <Navigate to="/friends" /> : <Register />} 
-          />
-          
-          {/* Protected routes */}
-          <Route 
-            path="/friends" 
-            element={
-              <ProtectedRoute>
-                <Friends />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/chat/:friendId" 
-            element={
-              <ProtectedRoute>
-                <Chat />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/videocall" 
-            element={
-              <ProtectedRoute>
-                <VideoCall />
-              </ProtectedRoute>
-            } 
-          />
-          
-          {/* Redirect all other routes */}
-          <Route path="*" element={isAuthenticated() ? <Navigate to="/friends" /> : <Navigate to="/login" />} />
-        </Routes>
-      </div>
+      <CallProvider>
+        <div className="App">
+          <Navbar />
+          <Routes>
+            {/* Public routes */}
+            <Route path="/" element={<Home />} />
+            <Route 
+              path="/login" 
+              element={isAuthenticated() ? <Navigate to="/friends" /> : <Login />} 
+            />
+            <Route 
+              path="/register" 
+              element={isAuthenticated() ? <Navigate to="/friends" /> : <Register />} 
+            />
+            
+            {/* Protected routes */}
+            <Route 
+              path="/friends" 
+              element={
+                <ProtectedRoute>
+                  <Friends />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/chat/:friendId" 
+              element={
+                <ProtectedRoute>
+                  <Chat />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/videocall" 
+              element={
+                <ProtectedRoute>
+                  <VideoCall />
+                </ProtectedRoute>
+              } 
+            />
+            
+            {/* Redirect all other routes */}
+            <Route path="*" element={isAuthenticated() ? <Navigate to="/friends" /> : <Navigate to="/login" />} />
+          </Routes>
+        </div>
+      </CallProvider>
     </Router>
   );
 }
