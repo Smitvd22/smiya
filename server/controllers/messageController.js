@@ -1,9 +1,14 @@
 import { pool } from '../config/db.js';
 
-// Get chat history with a specific user
+// Get chat history with a specific user (with pagination)
 export const getChatHistory = async (req, res) => {
   const { friendId } = req.params;
   const userId = req.user.userId;
+  
+  // Extract pagination parameters, default to page 1 with 20 messages per page
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 20;
+  const offset = (page - 1) * limit;
   
   try {
     // Get messages where current user is sender OR receiver
@@ -11,8 +16,9 @@ export const getChatHistory = async (req, res) => {
       `SELECT * FROM messages 
        WHERE (sender_id = $1 AND receiver_id = $2)
        OR (sender_id = $2 AND receiver_id = $1)
-       ORDER BY created_at ASC`,
-      [userId, friendId]
+       ORDER BY created_at DESC
+       LIMIT $3 OFFSET $4`,
+      [userId, friendId, limit, offset]
     );
     
     // Map DB column names to camelCase for frontend
@@ -24,7 +30,9 @@ export const getChatHistory = async (req, res) => {
       createdAt: msg.created_at
     }));
     
-    res.status(200).json(messages);
+    // Note: We're returning messages in DESC order to get the most recent first
+    // but we need to reverse them for display (oldest first)
+    res.status(200).json(messages.reverse());
   } catch (error) {
     console.error('Get chat history error:', error);
     res.status(500).json({ error: 'Failed to retrieve chat history' });

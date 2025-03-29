@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { pool } from './config/db.js';
-import { initSockets } from './sockets/messaging.js';
+import { initializeSocketIO } from './sockets/index.js'; // Updated import
 import { initializeDatabase } from './config/schema.js';
 import authRoutes from './routes/authRoutes.js';
 import friendRoutes from './routes/friendRoutes.js';
@@ -57,8 +57,8 @@ const server = app.listen(PORT, () => {
   const localUrl = `http://localhost:${PORT}`;
   console.log(`Server running on port ${PORT} in ${NODE_ENV} mode`);
   console.log(`📡 API Status: ${localUrl}/api/status`);
-  // Terminal clickable link (works in most modern terminals)
   console.log(`🚀 Server: \x1b[36m${localUrl}\x1b[0m`);
 });
-// Pass both server and app parameters
-initSockets(server, app);
+
+// Initialize Socket.IO with unified handlers
+initializeSocketIO(server, app);

@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Friends from './pages/Friends';
 import Chat from './pages/Chat';
+import VideoCall from './pages/VideoCall';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import { getCurrentUser } from './services/authService';
@@ -47,6 +48,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Chat />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/videocall" 
+            element={
+              <ProtectedRoute>
+                <VideoCall />
               </ProtectedRoute>
             } 
           />
