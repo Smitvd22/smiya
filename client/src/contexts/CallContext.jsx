@@ -74,8 +74,13 @@ export function CallProvider({ children }) {
     // Navigate to video call page with caller info
     navigate('/videocall', { 
       state: { 
-        callerInfo: callData
-      } 
+        callerInfo: {
+          signal: callData.signal,
+          id: callData.from,
+          username: callData.fromUsername
+        }
+      },
+      replace: true // Add replace: true to prevent navigation issues
     });
   };
   

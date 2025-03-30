@@ -64,7 +64,15 @@ export const setupSocketIO = (io) => {
     socket.on('end-call', (data) => {
       const { to } = data;
       console.log(`Call ended by ${socket.id} to ${to}`);
+      
+      // Emit to recipient
       io.to(`user-${to}`).emit('call-ended');
+      
+      // Clear socket room associations if needed
+      if (socket.userId) {
+        socket.leave(`call-${to}-${socket.userId}`);
+        socket.leave(`call-${socket.userId}-${to}`);
+      }
     });
     
     // ====== USER PRESENCE ======
