@@ -356,8 +356,10 @@ function VideoCall() {
       if (isComponentMounted.current) {
         setCallState('active');
         if (connectionRef.current) {
-          console.log("Sending signal to peer:", data.signal);
-          connectionRef.current.signal(data.signal);
+          // Check if data is the signal or contains the signal
+          const signalData = data.signal || data;
+          console.log("Sending signal to peer:", signalData);
+          connectionRef.current.signal(signalData);
         } else {
           console.error("Cannot handle accepted call: connectionRef is null");
           setCallError("Connection error");
@@ -402,24 +404,37 @@ function VideoCall() {
     };
   }, [callState, endCallHandler]);
 
-  // Modify your socket event useEffect to verify socket connection
-  useEffect(() => {
-    if (!socketRef.current) {
-      console.error("No socket available for event registration");
-      return;
-    }
-
-    console.log("Registering call event handlers on socket:", socketRef.current.id);
-
-    // Rest of your event handler code...
-  }, [callState, endCallHandler]);
-
   const answerCall = () => {
     if (!stream) {
-      setCallError("No camera access");
-      return;
+      // Instead of showing error immediately, try to get access first
+      console.log("No stream yet, attempting to get user media...");
+      
+      // Attempt to get media but continue even if it fails
+      getUserMedia()
+        .then(newStream => {
+          console.log("Successfully acquired media on answer");
+          setStream(newStream);
+          if (myVideo.current) {
+            myVideo.current.srcObject = newStream;
+          }
+          
+          // Continue with call even if we have a stream now
+          processAnswer(newStream);
+        })
+        .catch(err => {
+          console.error("Could not acquire media:", err);
+          // Continue with call even without camera
+          setCallError("Joining without camera access");
+          processAnswer(null);
+        });
+    } else {
+      // We already have a stream, proceed normally
+      processAnswer(stream);
     }
-    
+  };
+
+  // Separate function to process the answer with or without stream
+  const processAnswer = (mediaStream) => {
     if (!callerInfo || !callerInfo.signal) {
       setCallError("Missing caller information");
       setTimeout(() => {
@@ -436,7 +451,7 @@ function VideoCall() {
       
       const peer = createPeer(
         false, // Not the initiator
-        stream,
+        mediaStream, // Could be null if no camera access
         signal => {
           if (socketRef.current && callerInfo && isComponentMounted.current) {
             console.log("Answering call with signal:", signal);
@@ -524,14 +539,18 @@ function VideoCall() {
       )}
 
       <div className="videos-container">
-        {stream && (
-          <div className="video-player my-video">
+        {/* Always show my video container even if no stream */}
+        <div className="video-player my-video">
+          {stream ? (
             <video playsInline muted ref={myVideo} autoPlay />
-            <div className="video-label">You</div>
-          </div>
-        )}
+          ) : (
+            <div className="video-placeholder">Camera off</div>
+          )}
+          <div className="video-label">You</div>
+        </div>
         
-        {(callState === 'active' || callState === 'connected') && (
+        {/* Always show remote video when call is active */}
+        {callState === 'active' && (
           <div className="video-player user-video">
             <video playsInline ref={userVideo} autoPlay />
             <div className="video-label">{callerInfo?.username || 'User'}</div>
@@ -539,6 +558,7 @@ function VideoCall() {
         )}
       </div>
       
+      {/* Always show call controls when call is active */}
       {callState === 'active' && (
         <div className="call-controls">
           <button className="end-call" onClick={endCallHandler}>
@@ -562,6 +582,7 @@ function VideoCall() {
         <div>Socket: {socketConnected ? 'Connected' : 'Disconnected'}</div>
         {callerInfo && <div>Caller: {callerInfo.username} (ID: {callerInfo.id})</div>}
         {recipientId && <div>Recipient ID: {recipientId}</div>}
+        <div>Stream: {stream ? 'Available' : 'Not available'}</div>
       </div>
     </div>
   );

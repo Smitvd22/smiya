@@ -13,11 +13,10 @@ import Peer from 'simple-peer';
  */
 export const createPeer = (initiator, stream, onSignal, onConnect, onStream, onClose, onError) => {
   try {
-    console.log(`Creating ${initiator ? 'initiator' : 'receiver'} peer with stream:`, stream);
+    console.log(`Creating ${initiator ? 'initiator' : 'receiver'} peer ${stream ? 'with stream' : 'without stream'}`);
     
-    const peer = new Peer({
+    const peerOptions = {
       initiator,
-      stream,
       trickle: false,
       config: {
         iceServers: [
@@ -25,7 +24,14 @@ export const createPeer = (initiator, stream, onSignal, onConnect, onStream, onC
           { urls: 'stun:global.stun.twilio.com:3478' }
         ]
       }
-    });
+    };
+    
+    // Only add stream to options if it exists
+    if (stream) {
+      peerOptions.stream = stream;
+    }
+    
+    const peer = new Peer(peerOptions);
 
     // Add all event handlers
     if (onSignal) peer.on('signal', onSignal);
@@ -45,15 +51,13 @@ export const createPeer = (initiator, stream, onSignal, onConnect, onStream, onC
 
 /**
  * Helper function to get user media
+ * @param {Object} constraints - Media constraints
  * @returns {Promise<MediaStream>} Media stream
  */
-export const getUserMedia = async () => {
+export const getUserMedia = async (constraints = { video: true, audio: true }) => {
   try {
-    console.log('Requesting user media');
-    const stream = await navigator.mediaDevices.getUserMedia({ 
-      video: true, 
-      audio: true 
-    });
+    console.log('Requesting user media with constraints:', constraints);
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
     console.log('User media acquired successfully');
     return stream;
   } catch (error) {
