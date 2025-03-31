@@ -24,6 +24,36 @@ function VideoCall() {
   const socketRef = useRef(socket);
   const isComponentMounted = useRef(true);
 
+  // Define the setupConnectionListeners function with useCallback
+  const setupConnectionListeners = useCallback((peer) => {
+    if (!peer) return;
+    
+    peer.on('connect', () => {
+      if (isComponentMounted.current) {
+        setConnectionStatus('connected');
+        console.log("Peer connection established!");
+      }
+    });
+    
+    peer.on('error', (err) => {
+      console.error("Peer connection error:", err);
+      if (isComponentMounted.current) {
+        setConnectionStatus('error');
+      }
+    });
+    
+    peer.on('close', () => {
+      console.log("Peer connection closed");
+      if (isComponentMounted.current) {
+        setConnectionStatus('disconnected');
+      }
+    });
+
+    peer.on('data', (data) => {
+      console.log("Received data from peer:", data);
+    });
+  }, []);
+
   // Add this useEffect near the beginning of the component
   useEffect(() => {
     socketRef.current = socket;
@@ -42,6 +72,13 @@ function VideoCall() {
     const handleConnect = () => {
       console.log("Socket connected in VideoCall component");
       setSocketConnected(true);
+      
+      // Join user room on reconnection
+      const currentUser = getCurrentUser();
+      if (currentUser) {
+        socket.emit('join-user-room', `user-${currentUser.id}`);
+        console.log(`Joined user room: user-${currentUser.id}`);
+      }
     };
   
     const handleDisconnect = () => {
@@ -51,6 +88,11 @@ function VideoCall() {
   
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
+  
+    // Ensure we're properly connected when the component loads
+    if (socket.connected) {
+      handleConnect();
+    }
   
     return () => {
       socket.off('connect', handleConnect);
@@ -227,15 +269,15 @@ function VideoCall() {
         const currentUser = getCurrentUser();
         if (!currentUser) return;
         
-        console.log(`Initiating call to ${recipientId}`);
+        console.log(`Initiating call to ${recipientId} with stream:`, stream);
+        console.log('Socket connected:', socketRef.current?.connected);
         
         const peer = createPeer(
-          true, 
+          true, // Is the initiator 
           stream,
           signal => {
-            // Example for call-user event
             if (socketRef.current && socketRef.current.connected && isComponentMounted.current) {
-              console.log(`Emitting call-user to ${recipientId}`);
+              console.log(`Emitting call-user to ${recipientId} with signal:`, signal);
               socketRef.current.emit('call-user', {
                 userId: recipientId,
                 signalData: signal,
@@ -245,11 +287,14 @@ function VideoCall() {
             } else {
               console.error("Cannot emit call-user: Socket not connected", socketRef.current);
               setCallError("Connection to server lost");
-              // Handle error appropriately
             }
           },
-          () => console.log("Peer connection established"),
+          () => {
+            console.log("Peer connection established for caller");
+            setConnectionStatus('connected');
+          },
           remoteStream => {
+            console.log("Received remote stream:", remoteStream);
             if (userVideo.current && isComponentMounted.current) {
               userVideo.current.srcObject = remoteStream;
             }
@@ -264,12 +309,11 @@ function VideoCall() {
             console.error("Peer error:", error);
             if (isComponentMounted.current) {
               setCallError('Connection failed');
-              const timer = setTimeout(() => {
+              setTimeout(() => {
                 if (isComponentMounted.current) {
                   endCallHandler();
                 }
               }, 3000);
-              return () => clearTimeout(timer);
             }
           }
         );
@@ -280,35 +324,43 @@ function VideoCall() {
         console.error('Failed to initiate call:', error);
         if (isComponentMounted.current) {
           setCallError('Failed to initiate call');
-          const timer = setTimeout(() => {
+          setTimeout(() => {
             if (isComponentMounted.current) {
               endCallHandler();
             }
           }, 3000);
-          return () => clearTimeout(timer);
         }
       }
     }
-  }, [recipientId, stream, callState, endCallHandler]);
+  }, [recipientId, stream, callState, endCallHandler, setupConnectionListeners]);
 
   // Handle socket events for calls
   useEffect(() => {
-    if (!socketRef.current) return;
+    if (!socketRef.current) {
+      console.error("No socket available for event registration");
+      return;
+    }
+
+    console.log("Registering call event handlers on socket:", socketRef.current.id);
 
     const handleIncomingCall = ({ signal, from, fromUsername }) => {
-      console.log(`Incoming call from ${fromUsername} (${from})`);
+      console.log(`Incoming call from ${fromUsername} (${from})`, signal);
       if (isComponentMounted.current) {
         setCallState('receiving');
         setCallerInfo({ signal, id: from, username: fromUsername });
       }
     };
     
-    const handleCallAccepted = (signal) => {
-      console.log("Call accepted, establishing connection");
+    const handleCallAccepted = (data) => {
+      console.log("Call accepted, establishing connection with signal:", data);
       if (isComponentMounted.current) {
         setCallState('active');
         if (connectionRef.current) {
-          connectionRef.current.signal(signal);
+          console.log("Sending signal to peer:", data.signal);
+          connectionRef.current.signal(data.signal);
+        } else {
+          console.error("Cannot handle accepted call: connectionRef is null");
+          setCallError("Connection error");
         }
       }
     };
@@ -316,24 +368,22 @@ function VideoCall() {
     const handleCallRejected = () => {
       if (isComponentMounted.current) {
         setCallError('Call was declined');
-        const timer = setTimeout(() => {
+        setTimeout(() => {
           if (isComponentMounted.current) {
             endCallHandler();
           }
         }, 3000);
-        return () => clearTimeout(timer);
       }
     };
     
     const handleCallEnded = () => {
       if (isComponentMounted.current && callState !== 'idle') {
         setCallError('Call ended by other user');
-        const timer = setTimeout(() => {
+        setTimeout(() => {
           if (isComponentMounted.current) {
             endCallHandler();
           }
         }, 1500);
-        return () => clearTimeout(timer);
       }
     };
 
@@ -351,64 +401,6 @@ function VideoCall() {
       }
     };
   }, [callState, endCallHandler]);
-
-  // Replace the existing connection status effect
-  useEffect(() => {
-    // Updates connection status indicators when connection changes
-    const updateConnectionStatus = () => {
-      if (!connectionRef.current) return;
-      
-      // First remove any existing listeners to prevent duplicates
-      connectionRef.current.removeListener('connect', () => {});
-      connectionRef.current.removeListener('error', () => {});
-      connectionRef.current.removeListener('close', () => {});
-      
-      connectionRef.current.on('connect', () => {
-        if (isComponentMounted.current) {
-          setConnectionStatus('connected');
-        }
-      });
-      
-      connectionRef.current.on('error', () => {
-        if (isComponentMounted.current) {
-          setConnectionStatus('error');
-        }
-      });
-      
-      connectionRef.current.on('close', () => {
-        if (isComponentMounted.current) {
-          setConnectionStatus('disconnected');
-        }
-      });
-    };
-    
-    updateConnectionStatus();
-    
-    // No dependencies - we'll handle this differently
-  }, []);
-
-  // Add this function to the component (outside any useEffect)
-  const setupConnectionListeners = (peer) => {
-    if (!peer) return;
-    
-    peer.on('connect', () => {
-      if (isComponentMounted.current) {
-        setConnectionStatus('connected');
-      }
-    });
-    
-    peer.on('error', () => {
-      if (isComponentMounted.current) {
-        setConnectionStatus('error');
-      }
-    });
-    
-    peer.on('close', () => {
-      if (isComponentMounted.current) {
-        setConnectionStatus('disconnected');
-      }
-    });
-  };
 
   // Modify your socket event useEffect to verify socket connection
   useEffect(() => {
@@ -443,10 +435,11 @@ function VideoCall() {
       setCallState('active');
       
       const peer = createPeer(
-        false, 
+        false, // Not the initiator
         stream,
         signal => {
           if (socketRef.current && callerInfo && isComponentMounted.current) {
+            console.log("Answering call with signal:", signal);
             socketRef.current.emit('answer-call', { 
               signal, 
               to: callerInfo.id 
@@ -454,10 +447,11 @@ function VideoCall() {
           }
         },
         () => {
-          console.log("Peer connection established");
+          console.log("Peer connection established for answerer");
           setConnectionStatus('connected');
         },
         remoteStream => {
+          console.log("Received remote stream:", remoteStream);
           if (userVideo.current && isComponentMounted.current) {
             userVideo.current.srcObject = remoteStream;
           }
@@ -471,29 +465,28 @@ function VideoCall() {
           console.error("Connection error:", error);
           if (isComponentMounted.current) {
             setCallError('Connection error');
-            const timer = setTimeout(() => {
+            setTimeout(() => {
               if (isComponentMounted.current) {
                 endCallHandler();
               }
             }, 3000);
-            return () => clearTimeout(timer);
           }
         }
       );
       
+      // Log the signal we're processing
+      console.log("Processing incoming signal:", callerInfo.signal);
       peer.signal(callerInfo.signal);
       connectionRef.current = peer;
       setupConnectionListeners(peer);
     } catch (error) {
       console.error('Failed to answer call:', error);
-      if (isComponentMounted.current) {
-        setCallError('Failed to answer call');
-        setTimeout(() => {
-          if (isComponentMounted.current) {
-            endCallHandler();
-          }
-        }, 3000);
-      }
+      setCallError('Failed to answer call');
+      setTimeout(() => {
+        if (isComponentMounted.current) {
+          endCallHandler();
+        }
+      }, 3000);
     }
   };
 
@@ -538,7 +531,7 @@ function VideoCall() {
           </div>
         )}
         
-        {callState === 'active' && (
+        {(callState === 'active' || callState === 'connected') && (
           <div className="video-player user-video">
             <video playsInline ref={userVideo} autoPlay />
             <div className="video-label">{callerInfo?.username || 'User'}</div>
@@ -561,6 +554,15 @@ function VideoCall() {
           Socket disconnected - call functionality limited
         </div>
       )}
+
+      {/* Debug info */}
+      <div className="debug-info" style={{fontSize: '10px', color: '#666', margin: '10px', textAlign: 'left'}}>
+        <div>Call State: {callState}</div>
+        <div>Connection: {connectionStatus}</div>
+        <div>Socket: {socketConnected ? 'Connected' : 'Disconnected'}</div>
+        {callerInfo && <div>Caller: {callerInfo.username} (ID: {callerInfo.id})</div>}
+        {recipientId && <div>Recipient ID: {recipientId}</div>}
+      </div>
     </div>
   );
 }

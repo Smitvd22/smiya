@@ -1,4 +1,4 @@
-import SimplePeer from 'simple-peer';
+import Peer from 'simple-peer';
 
 /**
  * Create a WebRTC peer connection
@@ -9,55 +9,55 @@ import SimplePeer from 'simple-peer';
  * @param {Function} onStream - Callback when remote stream is received
  * @param {Function} onClose - Callback when connection is closed
  * @param {Function} onError - Callback when error occurs
- * @returns {SimplePeer} The peer connection object
+ * @returns {Peer} The peer connection object
  */
 export const createPeer = (initiator, stream, onSignal, onConnect, onStream, onClose, onError) => {
-  const peer = new SimplePeer({
-    initiator,
-    stream,
-    trickle: true,
-    config: { 
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-      ] 
-    }
-  });
+  try {
+    console.log(`Creating ${initiator ? 'initiator' : 'receiver'} peer with stream:`, stream);
+    
+    const peer = new Peer({
+      initiator,
+      stream,
+      trickle: false,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478' }
+        ]
+      }
+    });
 
-  peer.on('signal', data => {
-    if (onSignal) onSignal(data);
-  });
+    // Add all event handlers
+    if (onSignal) peer.on('signal', onSignal);
+    if (onConnect) peer.on('connect', onConnect);
+    if (onStream) peer.on('stream', onStream);
+    if (onClose) peer.on('close', onClose);
+    if (onError) peer.on('error', onError);
 
-  peer.on('connect', () => {
-    if (onConnect) onConnect();
-  });
-
-  peer.on('stream', remoteStream => {
-    if (onStream) onStream(remoteStream);
-  });
-
-  peer.on('close', () => {
-    if (onClose) onClose();
-  });
-
-  peer.on('error', err => {
-    if (onError) onError(err);
-  });
-
-  return peer;
+    console.log(`${initiator ? 'Initiator' : 'Receiver'} peer created successfully`);
+    return peer;
+  } catch (error) {
+    console.error('Error creating peer:', error);
+    if (onError) onError(error);
+    throw error;
+  }
 };
 
 /**
  * Helper function to get user media
- * @param {Object} constraints - Media constraints
  * @returns {Promise<MediaStream>} Media stream
  */
-export const getUserMedia = async (constraints = { video: true, audio: true }) => {
+export const getUserMedia = async () => {
   try {
-    return await navigator.mediaDevices.getUserMedia(constraints);
+    console.log('Requesting user media');
+    const stream = await navigator.mediaDevices.getUserMedia({ 
+      video: true, 
+      audio: true 
+    });
+    console.log('User media acquired successfully');
+    return stream;
   } catch (error) {
-    console.error('Error accessing media devices:', error);
+    console.error('Error getting user media:', error);
     throw error;
   }
 };
