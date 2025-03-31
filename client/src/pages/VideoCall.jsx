@@ -16,6 +16,7 @@ function VideoCall() {
   const [callerInfo, setCallerInfo] = useState(locationCallerInfo || null);
   const [callError, setCallError] = useState('');
   const [connectionStatus, setConnectionStatus] = useState('initializing');
+  const [socketConnected, setSocketConnected] = useState(false);
   
   const myVideo = useRef(null);
   const userVideo = useRef(null);
@@ -26,6 +27,35 @@ function VideoCall() {
   // Add this useEffect near the beginning of the component
   useEffect(() => {
     socketRef.current = socket;
+  }, [socket]);
+
+  // Add this effect to monitor socket status
+  useEffect(() => {
+    if (!socket) {
+      console.error("Socket is not available from context");
+      setSocketConnected(false);
+      return;
+    }
+  
+    setSocketConnected(socket.connected);
+  
+    const handleConnect = () => {
+      console.log("Socket connected in VideoCall component");
+      setSocketConnected(true);
+    };
+  
+    const handleDisconnect = () => {
+      console.log("Socket disconnected in VideoCall component");
+      setSocketConnected(false);
+    };
+  
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+  
+    return () => {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+    };
   }, [socket]);
 
   // Cleanup function to be used throughout the component
@@ -118,18 +148,17 @@ function VideoCall() {
 
   // Safe redirect if no valid call context
   useEffect(() => {
-    if (!recipientId && callState === 'idle') {
-      // No recipient ID and not receiving a call - invalid state
+    if (!recipientId && !callerInfo && callState === 'idle') {
+      console.log('No valid call context, redirecting back');
       const timer = setTimeout(() => {
-        if (isComponentMounted.current && callState === 'idle') {
-          console.log('No valid call context, redirecting back');
+        if (isComponentMounted.current) {
           navigate(-1);
         }
       }, 1000);
       
       return () => clearTimeout(timer);
     }
-  }, [recipientId, callState, navigate]);
+  }, [recipientId, callerInfo, callState, navigate]);
 
   // Initialize media stream
   useEffect(() => {
@@ -204,13 +233,19 @@ function VideoCall() {
           true, 
           stream,
           signal => {
-            if (socketRef.current && isComponentMounted.current) {
+            // Example for call-user event
+            if (socketRef.current && socketRef.current.connected && isComponentMounted.current) {
+              console.log(`Emitting call-user to ${recipientId}`);
               socketRef.current.emit('call-user', {
                 userId: recipientId,
                 signalData: signal,
                 from: currentUser.id,
                 fromUsername: currentUser.username
               });
+            } else {
+              console.error("Cannot emit call-user: Socket not connected", socketRef.current);
+              setCallError("Connection to server lost");
+              // Handle error appropriately
             }
           },
           () => console.log("Peer connection established"),
@@ -375,6 +410,18 @@ function VideoCall() {
     });
   };
 
+  // Modify your socket event useEffect to verify socket connection
+  useEffect(() => {
+    if (!socketRef.current) {
+      console.error("No socket available for event registration");
+      return;
+    }
+
+    console.log("Registering call event handlers on socket:", socketRef.current.id);
+
+    // Rest of your event handler code...
+  }, [callState, endCallHandler]);
+
   const answerCall = () => {
     if (!stream) {
       setCallError("No camera access");
@@ -406,7 +453,10 @@ function VideoCall() {
             });
           }
         },
-        () => console.log("Peer connection established"),
+        () => {
+          console.log("Peer connection established");
+          setConnectionStatus('connected');
+        },
         remoteStream => {
           if (userVideo.current && isComponentMounted.current) {
             userVideo.current.srcObject = remoteStream;
@@ -506,6 +556,11 @@ function VideoCall() {
 
       {connectionStatus === 'connected' && <div className="connection-indicator connected">Connected</div>}
       {connectionStatus === 'error' && <div className="connection-indicator error">Connection error</div>}
+      {!socketConnected && callState !== 'idle' && (
+        <div className="connection-indicator error">
+          Socket disconnected - call functionality limited
+        </div>
+      )}
     </div>
   );
 }

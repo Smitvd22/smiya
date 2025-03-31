@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import { getCurrentUser } from '../services/authService';
@@ -10,23 +10,26 @@ const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
 export function CallProvider({ children }) {
   const [incomingCall, setIncomingCall] = useState(null);
   const [socket, setSocket] = useState(null);
+  const socketRef = useRef(null);
   const navigate = useNavigate();
   
   // Single socket initialization for the entire app
   useEffect(() => {
     const user = getCurrentUser();
-    if (!user) return;
+    if (!user || socket) return; // Prevent duplicate connections
     
     console.log('Initializing global socket connection');
     
-    // Fix socket initialization with proper options
     const socketInstance = io(SOCKET_URL, {
+      reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
-      timeout: 20000,
-      transports: ['websocket', 'polling'],
+      transports: ['websocket'],
       autoConnect: true
     });
+    
+    // Store socket reference immediately to avoid race conditions
+    socketRef.current = socketInstance;
     
     socketInstance.on('connect', () => {
       console.log('Socket connected');
@@ -41,31 +44,62 @@ export function CallProvider({ children }) {
       console.error('Socket connection error:', error);
     });
     
+    socketInstance.on('error', (error) => {
+      console.error('Socket error:', error);
+    });
+    
     setSocket(socketInstance);
     
     return () => {
       console.log('Cleaning up socket connection');
       if (socketInstance) {
-        socketInstance.disconnect();
+        // Always try to clean up listeners first
+        try {
+          socketInstance.off('incoming-call');
+          socketInstance.off('connect');
+          socketInstance.off('disconnect');
+          socketInstance.off('connect_error');
+          socketInstance.off('error');
+        } catch (err) {
+          console.error('Error removing socket listeners:', err);
+        }
+        
+        // Then try to disconnect if connected
+        if (socketInstance.connected) {
+          try {
+            socketInstance.disconnect();
+          } catch (err) {
+            console.error('Error disconnecting socket:', err);
+          }
+        }
+        
+        socketRef.current = null;
       }
     };
-  }, []); // No dependencies needed here
+  }, []); // Empty dependency array to create socket only once
   
-  // Listen for incoming calls
+  // Listen for incoming calls - using socketRef to avoid dependency issues
   useEffect(() => {
-    if (!socket) return;
+    const currentSocket = socketRef.current;
+    if (!currentSocket) return;
     
     const handleIncomingCall = (callData) => {
       console.log('CallContext: Incoming call received', callData);
       setIncomingCall(callData);
     };
     
-    socket.on('incoming-call', handleIncomingCall);
+    currentSocket.on('incoming-call', handleIncomingCall);
     
     return () => {
-      socket.off('incoming-call', handleIncomingCall);
+      if (currentSocket) {
+        try {
+          currentSocket.off('incoming-call', handleIncomingCall);
+        } catch (err) {
+          console.error('Error removing incoming-call listener:', err);
+        }
+      }
     };
-  }, [socket]);
+  }, [socketRef.current]); // This will run once and when the socket reference changes
   
   const handleAcceptCall = (callData) => {
     console.log('CallContext: Accepting call', callData);
@@ -86,8 +120,9 @@ export function CallProvider({ children }) {
   
   const handleRejectCall = (callData) => {
     console.log('CallContext: Rejecting call', callData);
-    if (socket) {
-      socket.emit('reject-call', { to: callData.from });
+    const currentSocket = socketRef.current;
+    if (currentSocket) {
+      currentSocket.emit('reject-call', { to: callData.from });
     }
     setIncomingCall(null);
   };
@@ -97,7 +132,8 @@ export function CallProvider({ children }) {
       value={{ 
         socket, 
         joinChatRoom: (roomId) => {
-          if (socket) socket.emit('join-room', roomId);
+          const currentSocket = socketRef.current;
+          if (currentSocket) currentSocket.emit('join-room', roomId);
         }
       }}
     >

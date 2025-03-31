@@ -18,6 +18,8 @@ function Chat() {
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [socketConnected, setSocketConnected] = useState(false);
+  const socketRef = useRef(socket);
   
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -74,34 +76,18 @@ function Chat() {
       
       console.log(`Fetching friend info for ID: ${friendId}`);
       
-      try {
-        // Try the /users endpoint first
-        const response = await axios.get(`${API_URL}/users/${friendId}`, {
-          headers: { Authorization: `Bearer ${currentUser.token}` }
-        });
-        
-        if (response.data) {
-          console.log("Friend info from /users:", response.data);
-          setFriendInfo(response.data);
-        } else {
-          throw new Error("Empty response from users endpoint");
-        }
-      } catch (userErr) {
-        console.error("Error with /users endpoint:", userErr);
-        
-        // Fallback to /friends endpoint
-        const friendsResponse = await axios.get(`${API_URL}/friends`, {
-          headers: { Authorization: `Bearer ${currentUser.token}` }
-        });
-        
-        const friend = friendsResponse.data.find(f => f.id === parseInt(friendId, 10));
-        
-        if (friend) {
-          console.log("Found friend in friends list:", friend);
-          setFriendInfo(friend);
-        } else {
-          throw new Error("Friend not found");
-        }
+      // Only try the friends endpoint
+      const friendsResponse = await axios.get(`${API_URL}/friends`, {
+        headers: { Authorization: `Bearer ${currentUser.token}` }
+      });
+      
+      const friend = friendsResponse.data.find(f => f.id === parseInt(friendId, 10));
+      
+      if (friend) {
+        console.log("Found friend in friends list:", friend);
+        setFriendInfo(friend);
+      } else {
+        throw new Error("Friend not found");
       }
     } catch (err) {
       console.error('Error fetching friend info:', err);
@@ -210,6 +196,47 @@ function Chat() {
     }
   }, [messages, loadingMore]);
   
+  useEffect(() => {
+    // Update the ref when socket changes
+    socketRef.current = socket;
+    
+    if (!socket) {
+      console.error("Socket is not available from context");
+      setSocketConnected(false);
+      return;
+    }
+
+    setSocketConnected(socket.connected);
+
+    const handleConnect = () => {
+      console.log("Socket connected in Chat component");
+      setSocketConnected(true);
+      
+      // Re-join chat room on reconnection
+      if (friendId) {
+        const currentUser = getCurrentUser();
+        if (currentUser) {
+          const roomId = [currentUser.id, friendId].sort().join('-');
+          console.log(`Rejoining chat room after reconnect: ${roomId}`);
+          socket.emit('join-room', roomId);
+        }
+      }
+    };
+
+    const handleDisconnect = () => {
+      console.log("Socket disconnected in Chat component");
+      setSocketConnected(false);
+    };
+
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+
+    return () => {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+    };
+  }, [socket, friendId]);
+
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!messageInput.trim()) return;
@@ -218,6 +245,13 @@ function Chat() {
     if (!currentUser || !currentUser.token) {
       setError('You need to be logged in');
       return;
+    }
+    
+    if (!socketConnected) {
+      console.warn('Socket disconnected, message delivery may be delayed');
+      // Show a temporary warning but continue sending (the HTTP request will still work)
+      setError('Connection issue. Message will be sent when connection is restored.');
+      setTimeout(() => setError(''), 3000);
     }
     
     try {
@@ -268,6 +302,19 @@ function Chat() {
       </div>
       
       {error && <div className="error-message">{error}</div>}
+      
+      {!socketConnected && (
+        <div className="connection-warning" style={{
+          backgroundColor: "#fff3cd", 
+          color: "#856404", 
+          padding: "8px 12px", 
+          borderRadius: "4px",
+          margin: "8px 0",
+          textAlign: "center"
+        }}>
+          ⚠️ Connection lost. Messages may not be delivered immediately.
+        </div>
+      )}
       
       <div 
         className="messages-container" 
