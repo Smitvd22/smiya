@@ -158,6 +158,34 @@ video {
   border-radius: 8px;
 }
 
+.toggle-audio, .toggle-video {
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toggle-audio:hover, .toggle-video:hover {
+  background-color: #0b7dda;
+  transform: scale(1.1);
+}
+
+.toggle-audio.disabled, .toggle-video.disabled {
+  background-color: #f44336;
+}
+
+.toggle-audio.disabled:hover, .toggle-video.disabled:hover {
+  background-color: #d32f2f;
+}
+
 /* Media queries for responsive design */
 @media (max-width: 768px) {
   .videos-container {
