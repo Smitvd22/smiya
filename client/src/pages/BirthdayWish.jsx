@@ -3,14 +3,38 @@ import '../styles/BirthdayWish.css';
 
 function BirthdayWish() {
   const cards = useRef([]);
-  const [showFirstPopup, setShowFirstPopup] = useState(false);
-  const [showSecondPopup, setShowSecondPopup] = useState(false);
-  const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
-  const [attempts, setAttempts] = useState(0);
+  const [activePopupIndex, setActivePopupIndex] = useState(0);
+  const [visitedPopups, setVisitedPopups] = useState([0]);
+  const [lines, setLines] = useState([]);
+  const [showPopups, setShowPopups] = useState(false);
   
-  // Prevent scrolling when popup is visible
+  // Calculate 10 fixed positions along a heart shape with a better spread
+  const heartPositions = Array(10).fill(0).map((_, i) => {
+    // Evenly distribute points around the heart
+    const t = Math.PI / 2 + (i * ((2 * Math.PI) / 10));
+    const scale = 250; // Increased scale to make the heart larger
+    const adjustedX = 16 * Math.pow(Math.sin(t), 3) * (scale / 16);
+    const adjustedY = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) * (scale / 16);
+    return { x: adjustedX, y: adjustedY };
+  });
+  
+  // Popup content for each step
+  const popupContent = [
+    { title: "Would you like to create a birthday wish?", yesText: "Yes", noText: "No" },
+    { title: "Would you like to see our special templates?", yesText: "Yes, please", noText: "Not now" },
+    { title: "Would you like to add a personal message?", yesText: "Of course", noText: "Skip this" },
+    { title: "Should we add some decorations?", yesText: "Yes, make it fancy", noText: "Keep it simple" },
+    { title: "Want to include a photo?", yesText: "Add photo", noText: "No photo" },
+    { title: "Would you like to schedule delivery?", yesText: "Schedule it", noText: "Send now" },
+    { title: "Would you like to include a gift card?", yesText: "Yes, add gift", noText: "No thanks" },
+    { title: "Would you like to share on social media?", yesText: "Share it", noText: "Keep private" },
+    { title: "Would you like to save this for later?", yesText: "Save it", noText: "Finish now" },
+    { title: "Want to create another wish?", yesText: "Create new", noText: "I'm done" }
+  ];
+  
+  // Prevent scrolling when popups are visible
   useEffect(() => {
-    if (showFirstPopup || showSecondPopup) {
+    if (showPopups) {
       document.body.classList.add('no-scroll');
     } else {
       document.body.classList.remove('no-scroll');
@@ -19,21 +43,19 @@ function BirthdayWish() {
     return () => {
       document.body.classList.remove('no-scroll');
     };
-  }, [showFirstPopup, showSecondPopup]);
+  }, [showPopups]);
   
+  // Show popups after a short delay
   useEffect(() => {
-    // Show first popup after a short delay when page loads
     const timer = setTimeout(() => {
-      setShowFirstPopup(true);
-      // Set initial position slightly off-center
-      setRandomPopupPosition();
+      setShowPopups(true);
     }, 1000);
     
     return () => clearTimeout(timer);
   }, []);
-
+  
   useEffect(() => {
-    // Add scroll animation
+    // Add scroll animation for the cards
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -45,15 +67,12 @@ function BirthdayWish() {
       { threshold: 0.3 }
     );
     
-    // Store current cards for cleanup
     const currentCards = [...cards.current];
     
-    // Observe all cards
     currentCards.forEach((card) => {
       observer.observe(card);
     });
     
-    // Cleanup using stored cards reference
     return () => {
       currentCards.forEach((card) => {
         if (card) observer.unobserve(card);
@@ -61,90 +80,37 @@ function BirthdayWish() {
     };
   }, []);
   
-  // Function to set random popup position
-  const setRandomPopupPosition = () => {
-    // Generate more dramatic positions for larger movements
-    const maxX = window.innerWidth * 0.8;
-    const maxY = window.innerHeight * 0.8;
-    
-    // Multiplier to make movement 10x more dramatic (as requested)
-    const multiplier = 3; // Increasing the multiplier for more dramatic effect
-    
-    // Force significant movement by always alternating between screen quadrants
-    const quadrant = Math.floor(Math.random() * 4); // 0,1,2,3
-    
-    let newX, newY;
-    
-    switch(quadrant) {
-      case 0: // top-left
-        newX = -(Math.random() * maxX/2 + maxX/4) * multiplier;
-        newY = -(Math.random() * maxY/2 + maxY/4) * multiplier;
-        break;
-      case 1: // top-right
-        newX = (Math.random() * maxX/2 + maxX/4) * multiplier;
-        newY = -(Math.random() * maxY/2 + maxY/4) * multiplier;
-        break;
-      case 2: // bottom-left
-        newX = -(Math.random() * maxX/2 + maxX/4) * multiplier;
-        newY = (Math.random() * maxY/2 + maxY/4) * multiplier;
-        break;
-      case 3: // bottom-right
-        newX = (Math.random() * maxX/2 + maxX/4) * multiplier;
-        newY = (Math.random() * maxY/2 + maxY/4) * multiplier;
-        break;
-      default: // Fallback position (center with slight offset)
-        newX = (Math.random() > 0.5 ? 1 : -1) * maxX/4;
-        newY = (Math.random() > 0.5 ? 1 : -1) * maxY/4;
-        break;
+  const handleYesClick = () => {
+    // Create a line from current popup to next popup
+    if (activePopupIndex < 9) {
+      const currentPos = heartPositions[activePopupIndex];
+      const nextPos = heartPositions[activePopupIndex + 1];
+      
+      setLines(prev => [
+        ...prev, 
+        { 
+          x1: currentPos.x, 
+          y1: currentPos.y, 
+          x2: nextPos.x, 
+          y2: nextPos.y,
+          key: `line-${activePopupIndex}-${activePopupIndex + 1}`
+        }
+      ]);
+      
+      // Move to next popup
+      const nextIndex = activePopupIndex + 1;
+      setActivePopupIndex(nextIndex);
+      setVisitedPopups(prev => [...prev, nextIndex]);
+    } else {
+      // Complete the journey
+      setShowPopups(false);
     }
-
-    // Force re-rendering by using a unique value each time
-    const timestamp = Date.now();
-    
-    // Use functional state update to ensure we're working with latest state
-    setPopupPosition(prevPosition => ({
-      x: newX,
-      y: newY,
-      timestamp // Adding timestamp to force state change even if x,y are similar
-    }));
+  };
+  
+  const handleNoClick = () => {
+    // Visual feedback for "No" click - could add a small shake animation
   };
 
-  const handleFirstYesClick = () => {
-    setShowFirstPopup(false);
-    setShowSecondPopup(true);
-    setRandomPopupPosition(); // Already here, this is good
-  };
-  
-  const handleFirstNoClick = () => {
-    // Move popup to a new position with each "no" click
-    setAttempts(attempts + 1);
-    
-    // After 3 attempts, make the popup more persistent but still allow closing
-    if (attempts >= 3) {
-      handleFirstYesClick();
-    } else {
-      // Generate random offset for popup position
-      setRandomPopupPosition(); // Already here, this is good
-    }
-  };
-  
-  const handleSecondYesClick = () => {
-    setRandomPopupPosition(); // Add this line to change position when Yes is clicked
-    setShowSecondPopup(false);
-    // Optional: Show a thank you message or confetti animation
-  };
-  
-  const handleSecondNoClick = () => {
-    // Similar pattern as first popup
-    setAttempts(attempts + 1);
-    
-    if (attempts >= 5) {
-      handleSecondYesClick();
-    } else {
-      setRandomPopupPosition(); // Already here, this is good
-    }
-  };
-  
   const birthdayCards = [
     {
       id: 1,
@@ -180,7 +146,7 @@ function BirthdayWish() {
       image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176',
       message: 'Count your life by smiles, not tears. Count your age by friends, not years!',
       sender: 'With love from Smiya'
-    },
+    }
   ];
   
   const addToRefs = (el) => {
@@ -192,42 +158,58 @@ function BirthdayWish() {
   return (
     <div className="birthday-container">
       {/* Add blur overlay when popups are active */}
-      {(showFirstPopup || showSecondPopup) && <div className="blur-overlay"></div>}
-      
-      {showFirstPopup && (
-        <div 
-          key={`popup-1-${popupPosition.timestamp || Math.random()}`}
-          className="birthday-popup"
-          style={{
-            transform: `translate(calc(-50% + ${popupPosition.x}px), calc(-50% + ${popupPosition.y}px))`,
-            transition: 'transform 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55)'
-          }}
-        >
-          <h3>Would you like to create a birthday wish?</h3>
-          <div className="popup-buttons">
-            <button className="popup-btn yes-btn" onClick={handleFirstYesClick}>Yes</button>
-            <button className="popup-btn no-btn" onClick={handleFirstNoClick}>No</button>
-          </div>
-        </div>
+      {showPopups && (
+        <>
+          <div className="blur-overlay"></div>
+          
+          {/* Render connecting lines between popups */}
+          <svg className="connection-lines" width="100%" height="100%" style={{ position: 'fixed', top: 0, left: 0, zIndex: 999, pointerEvents: 'none' }}>
+            {lines.map((line) => (
+              <line
+                key={line.key}
+                x1={`calc(50% + ${line.x1}px)`}
+                y1={`calc(50% + ${line.y1}px)`}
+                x2={`calc(50% + ${line.x2}px)`}
+                y2={`calc(50% + ${line.y2}px)`}
+                stroke="#ff69b4"
+                strokeWidth="3"
+                strokeDasharray="5,5"
+                className="connection-line"
+              />
+            ))}
+          </svg>
+          
+          {/* Render all popups - show only visited ones */}
+          {heartPositions.map((pos, index) => (
+            visitedPopups.includes(index) && (
+              <div
+                key={`popup-${index}`}
+                className={`birthday-popup ${index !== activePopupIndex ? 'inactive-popup' : ''} ${index % 2 === 1 ? 'second-popup' : ''}`}
+                style={{
+                  position: 'fixed',
+                  top: `calc(50% + ${pos.y}px)`,
+                  left: `calc(50% + ${pos.x}px)`,
+                  transform: 'translate(-50%, -50%)'
+                }}
+              >
+                <h3>{popupContent[index].title}</h3>
+                {index === activePopupIndex && (
+                  <div className="popup-buttons">
+                    <button className="popup-btn yes-btn" onClick={handleYesClick}>
+                      {popupContent[index].yesText}
+                    </button>
+                    <button className="popup-btn no-btn" onClick={handleNoClick}>
+                      {popupContent[index].noText}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          ))}
+        </>
       )}
       
-      {showSecondPopup && (
-        <div 
-          key={`popup-2-${popupPosition.timestamp || Math.random()}`}
-          className="birthday-popup second-popup"
-          style={{
-            transform: `translate(calc(-50% + ${popupPosition.x}px), calc(-50% + ${popupPosition.y}px))`,
-            transition: 'transform 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55)'
-          }}
-        >
-          <h3>Would you like to see our special birthday templates?</h3>
-          <div className="popup-buttons">
-            <button className="popup-btn yes-btn" onClick={handleSecondYesClick}>Yes, show me!</button>
-            <button className="popup-btn no-btn" onClick={handleSecondNoClick}>Not now</button>
-          </div>
-        </div>
-      )}
-      
+      {/* The rest of your component remains the same */}
       <div className="birthday-header">
         <h1>Birthday Wishes</h1>
         <p>Send beautiful birthday wishes to your friends and family</p>
