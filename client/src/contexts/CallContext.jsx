@@ -25,8 +25,10 @@ export function CallProvider({ children }) {
     
     const socketInstance = io(SOCKET_URL, {
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
       transports: ['websocket'],
       autoConnect: true
     });

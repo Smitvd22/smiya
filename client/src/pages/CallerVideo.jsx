@@ -15,11 +15,11 @@ function CallerVideo() {
     setCallState,
     callError,
     setCallError,
-    // Use these variables to display connection status indicators in UI if needed
     connectionStatus, 
     socketConnected,
     isAudioEnabled,
     isVideoEnabled,
+    streamInitialized,
     myVideo,
     userVideo,
     connectionRef,
@@ -31,7 +31,6 @@ function CallerVideo() {
     initializeStream,
     navigate,
     endCallHandler,
-    callerInfo,
   } = useVideoCallCommon();
 
   // Set call state to 'calling' when component mounts
@@ -57,148 +56,132 @@ function CallerVideo() {
 
   // Initialize media stream for caller
   useEffect(() => {
-    let localStream = null;
+    if (callState !== 'idle') {
+      initializeStream().catch(err => {
+        console.error("Failed to initialize stream:", err);
+        if (isComponentMounted.current) {
+          setCallError('Unable to access media devices');
+          // Continue with call attempt anyway after a delay
+          setTimeout(() => {
+            setCallError('');
+          }, 3000);
+        }
+      });
+    }
+  }, [callState, initializeStream, isComponentMounted, setCallError]);
+
+  // Make outgoing call when recipientId is provided
+  useEffect(() => {
+    if (!recipientId || callState !== 'calling' || !socketRef.current || connectionRef.current) {
+      return;
+    }
     
-    const initStream = async () => {
-      const currentStream = await initializeStream();
-      if (!currentStream) {
-        const timer = setTimeout(() => {
-          if (isComponentMounted.current) {
-            if (recipientId) {
-              navigate('/chat/' + recipientId, { replace: true });
+    // Wait a moment for stream to initialize, but don't block indefinitely
+    const initiateCallTimeout = setTimeout(async () => {
+      try {
+        const currentUser = getCurrentUser();
+        if (!currentUser) {
+          setCallError('Authentication error');
+          return;
+        }
+        
+        // Try to get the stream but continue even if there's no stream
+        let mediaStream;
+        try {
+          mediaStream = await initializeStream(true, true);
+        } catch (err) {
+          console.log('Proceeding with call without media:', err);
+        }
+        
+        console.log(`Initiating call to ${recipientId}${mediaStream ? ' with stream' : ' without stream'}`);
+        
+        if (!socketRef.current.connected) {
+          setCallError('Server connection lost');
+          setTimeout(() => endCallHandler(), 3000);
+          return;
+        }
+        
+        // Create the peer connection
+        const peer = createPeer(
+          true, // Is the initiator 
+          mediaStream, // Can be null/empty
+          signal => {
+            if (socketRef.current && socketRef.current.connected && isComponentMounted.current) {
+              console.log(`Emitting call-user to ${recipientId}`);
+              socketRef.current.emit('call-user', {
+                userId: recipientId,
+                signalData: signal,
+                from: currentUser.id,
+                fromUsername: currentUser.username
+              });
             } else {
-              navigate(-1);
+              console.error("Cannot emit call-user: Socket not connected");
+              setCallError("Connection to server lost");
+            }
+          },
+          () => {
+            console.log("Peer connection established for caller");
+            setCallState('active');
+          },
+          remoteStream => {
+            console.log("Received remote stream");
+            if (userVideo.current && isComponentMounted.current) {
+              userVideo.current.srcObject = remoteStream;
+            }
+          },
+          () => {
+            console.log("Peer connection closed");
+            if (isComponentMounted.current) {
+              endCallHandler();
+            }
+          },
+          error => {
+            console.error("Peer error:", error);
+            if (isComponentMounted.current) {
+              setCallError('Connection failed');
+              setTimeout(() => {
+                if (isComponentMounted.current) {
+                  endCallHandler();
+                }
+              }, 3000);
             }
           }
-        }, 3000);
-        return () => clearTimeout(timer);
-      }
-      localStream = currentStream;
-    };
-    
-    if (callState !== 'idle') {
-      initStream();
-    }
-    
-    return () => {
-      if (localStream) {
-        try {
-          localStream.getTracks().forEach(track => track.stop());
-        } catch (err) {
-          console.error("Error stopping tracks on cleanup:", err);
-        }
-      }
-    };
-  }, [callState, navigate, recipientId, initializeStream, isComponentMounted]);
-
-  // Make outgoing call when recipientId is provided and stream is ready
-  useEffect(() => {
-    if (!recipientId || !stream || !socketRef.current || callState !== 'calling' || connectionRef.current) {
-      return;
-    }
-
-    // Add additional check for stream tracks
-    if (!stream.getTracks || stream.getTracks().length === 0) {
-      console.error("Stream has no tracks");
-      setCallError('Camera/microphone not available');
-      return;
-    }
-
-    let timeoutId;
-    
-    try {
-      const currentUser = getCurrentUser();
-      if (!currentUser) {
-        setCallError('Authentication error');
-        return;
-      }
-      
-      // Add connection timeout
-      timeoutId = setTimeout(() => {
-        if (callState === 'calling' && isComponentMounted.current) {
-          setCallError('Call timeout - no answer');
-          endCallHandler();
-        }
-      }, 30000); // 30 second timeout
-
-      console.log(`Initiating call to ${recipientId} with stream:`, stream);
-      console.log('Socket connected:', socketRef.current?.connected);
-      
-      const peer = createPeer(
-        true, // Is the initiator 
-        stream,
-        signal => {
-          if (socketRef.current && socketRef.current.connected && isComponentMounted.current) {
-            console.log(`Emitting call-user to ${recipientId} with signal:`, signal);
-            socketRef.current.emit('call-user', {
-              userId: recipientId,
-              signalData: signal,
-              from: currentUser.id,
-              fromUsername: currentUser.username
-            });
-          } else {
-            console.error("Cannot emit call-user: Socket not connected", socketRef.current);
-            setCallError("Connection to server lost");
-          }
-        },
-        () => {
-          console.log("Peer connection established for caller");
-          setCallState('active');
-        },
-        remoteStream => {
-          console.log("Received remote stream:", remoteStream);
-          if (userVideo.current && isComponentMounted.current) {
-            userVideo.current.srcObject = remoteStream;
-          }
-        },
-        () => {
-          console.log("Peer connection closed");
-          if (isComponentMounted.current) {
-            endCallHandler();
-          }
-        },
-        error => {
-          console.error("Peer error:", error);
-          if (isComponentMounted.current) {
-            setCallError('Connection failed');
-            setTimeout(() => {
-              if (isComponentMounted.current) {
-                endCallHandler();
-              }
-            }, 3000);
-          }
-        }
-      );
-      
-      connectionRef.current = peer;
-      setupConnectionListeners(peer);
-    } catch (error) {
-      console.error('Failed to initiate call:', error);
-      if (isComponentMounted.current) {
+        );
+        
+        connectionRef.current = peer;
+        setupConnectionListeners(peer);
+      } catch (error) {
+        console.error('Failed to initiate call:', error);
         setCallError('Failed to initiate call');
-        setTimeout(() => {
-          if (isComponentMounted.current) {
-            endCallHandler();
-          }
-        }, 3000);
+        setTimeout(() => endCallHandler(), 3000);
       }
-    }
+    }, streamInitialized ? 0 : 1000);
+    
+    // Call timeout
+    const callTimeoutId = setTimeout(() => {
+      if (callState === 'calling' && isComponentMounted.current) {
+        setCallError('Call timeout - no answer');
+        endCallHandler();
+      }
+    }, 30000);
 
     return () => {
-      if (timeoutId) clearTimeout(timeoutId);
+      clearTimeout(initiateCallTimeout);
+      clearTimeout(callTimeoutId);
     };
   }, [
     recipientId, 
-    stream, 
     callState, 
-    setCallError, 
-    setCallState, 
-    setupConnectionListeners, 
-    isComponentMounted,
+    streamInitialized,
     endCallHandler,
+    setupConnectionListeners,
+    isComponentMounted,
     userVideo,
     connectionRef,
-    socketRef
+    socketRef,
+    initializeStream,
+    setCallError,
+    setCallState
   ]);
 
   // Handle socket events for calls
@@ -216,6 +199,7 @@ function CallerVideo() {
       
       if (isComponentMounted.current) {
         try {
+          console.log("Call accepted, receiving signal:", signal);
           connectionRef.current.signal(signal);
           setCallState('active');
         } catch (err) {
@@ -247,7 +231,7 @@ function CallerVideo() {
 
     return () => {
       // Make sure socket still exists before removing listeners
-      if (socket && socket.connected) {
+      if (socket) {
         socket.off('call-accepted', handleCallAccepted);
         socket.off('call-rejected', handleCallRejected);
         socket.off('call-ended', handleCallEnded);
@@ -272,9 +256,9 @@ function CallerVideo() {
       endCallHandler={endCallHandler}
       callError={callError}
       callState={callState}
-      callerInfo={callerInfo}
       connectionStatus={connectionStatusDisplay}
       // Pass null functions for caller (not needed but avoids prop errors)
+      callerInfo={null}
       answerCall={null}
       rejectCall={null}
     />

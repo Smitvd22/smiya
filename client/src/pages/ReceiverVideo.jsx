@@ -1,7 +1,7 @@
 // ReceiverVideo.jsx
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { createPeer, getUserMedia } from '../utils/webrtc';
+import { createPeer } from '../utils/webrtc';
 import { useVideoCallCommon } from './VideoCallCommon';
 import VideoCallInterface from '../components/VideoCallInterface';
 
@@ -19,6 +19,7 @@ function ReceiverVideo() {
     setCallError,
     isAudioEnabled,
     isVideoEnabled,
+    streamInitialized,
     myVideo,
     userVideo,
     connectionRef,
@@ -33,54 +34,40 @@ function ReceiverVideo() {
   } = useVideoCallCommon();
 
   // Handle answering an incoming call
-  const answerCall = () => {
-    if (!stream) {
-      // Instead of showing error immediately, try to get access first
-      console.log("No stream yet, attempting to get user media...");
-      
-      // Attempt to get media but continue even if it fails
-      getUserMedia()
-        .then(newStream => {
-          console.log("Successfully acquired media on answer");
-          setStream(newStream);
-          if (myVideo.current) {
-            myVideo.current.srcObject = newStream;
-          }
-          
-          // Continue with call even if we have a stream now
-          processAnswer(newStream);
-        })
-        .catch(err => {
-          console.error("Could not acquire media:", err);
-          // Continue with call even without camera
-          setCallError("Joining without camera access");
-          processAnswer(null);
-        });
-    } else {
-      // We already have a stream, proceed normally
-      processAnswer(stream);
-    }
-  };
-
-  // Process the answer with or without stream
-  const processAnswer = (mediaStream) => {
-    if (!callerInfo || !callerInfo.signal) {
-      setCallError("Missing caller information");
-      setTimeout(() => {
-        if (isComponentMounted.current) {
-          endCallHandler();
-        }
-      }, 2000);
-      return;
-    }
-    
+  const answerCall = async () => {
     try {
       // Set call as active immediately to update UI
       setCallState('active');
       
+      // Try to get stream but continue if not possible
+      let mediaStream = stream;
+      
+      if (!mediaStream) {
+        console.log("No stream yet, attempting to get user media...");
+        try {
+          mediaStream = await initializeStream();
+        } catch (err) {
+          console.error("Error initializing stream:", err);
+          // Continue without media
+          setCallError("Joining without camera access");
+        }
+      }
+      
+      // Only proceed if we still have a valid context
+      if (!isComponentMounted.current || !callerInfo || !callerInfo.signal) {
+        setCallError("Missing caller information");
+        setTimeout(() => {
+          if (isComponentMounted.current) {
+            endCallHandler();
+          }
+        }, 2000);
+        return;
+      }
+      
+      console.log("Creating receiver peer");
       const peer = createPeer(
         false, // Not the initiator
-        mediaStream, // Could be null if no camera access
+        mediaStream, // Could be null
         signal => {
           if (socketRef.current && callerInfo && isComponentMounted.current) {
             console.log("Answering call with signal:", signal);
@@ -92,7 +79,9 @@ function ReceiverVideo() {
         },
         () => {
           console.log("Peer connection established for answerer");
-          setCallState('active');
+          if (isComponentMounted.current) {
+            setCallState('active');
+          }
         },
         remoteStream => {
           console.log("Received remote stream:", remoteStream);
@@ -120,9 +109,14 @@ function ReceiverVideo() {
       
       // Log the signal we're processing
       console.log("Processing incoming signal:", callerInfo.signal);
-      peer.signal(callerInfo.signal);
+      
+      // Store the peer in ref and add listeners
       connectionRef.current = peer;
       setupConnectionListeners(peer);
+      
+      // Process the signal
+      peer.signal(callerInfo.signal);
+      
     } catch (error) {
       console.error('Failed to answer call:', error);
       setCallError('Failed to answer call');
@@ -150,6 +144,7 @@ function ReceiverVideo() {
   useEffect(() => {
     if (locationCallerInfo) {
       setCallState('receiving');
+      // Try to initialize stream but don't block on it
       initializeStream().catch(err => {
         console.error("Failed to initialize stream:", err);
       });
@@ -179,7 +174,7 @@ function ReceiverVideo() {
 
     // Store reference to socket to use in cleanup
     const socket = socketRef.current;
-
+    
     const handleIncomingCall = ({ signal, from, fromUsername }) => {
       console.log(`Incoming call from ${fromUsername} (${from})`, signal);
       if (isComponentMounted.current) {
