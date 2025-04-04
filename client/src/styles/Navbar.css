@@ -149,3 +149,20 @@
 .dropdown-item.logout:hover {
   background-color: rgba(244, 67, 54, 0.1);
 }
+
+.birthday-nav-item {
+  background-color: rgba(255, 223, 186, 0.2);
+  border-radius: 20px;
+  padding: 8px 15px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #e67e22;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.birthday-nav-item:hover {
+  background-color: rgba(255, 223, 186, 0.4);
+  transform: scale(1.05);
+}

@@ -1,0 +1,303 @@
+.birthday-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  position: relative;
+}
+
+.birthday-header {
+  text-align: center;
+  margin-bottom: 40px;
+  padding: 30px 0;
+  position: relative;
+}
+
+.birthday-header h1 {
+  font-size: 3rem;
+  margin-bottom: 16px;
+  background: linear-gradient(45deg, #ff7b89, #8a5082, #6f5980, #3c6997);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gradientAnimation 6s ease infinite;
+}
+
+.birthday-header p {
+  font-size: 1.2rem;
+  color: #666;
+}
+
+.birthday-decoration {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+}
+
+.birthday-decoration span {
+  font-size: 2rem;
+  animation: bounce 2s infinite;
+}
+
+.birthday-decoration span:nth-child(1) { animation-delay: 0s; }
+.birthday-decoration span:nth-child(2) { animation-delay: 0.2s; }
+.birthday-decoration span:nth-child(3) { animation-delay: 0.4s; }
+.birthday-decoration span:nth-child(4) { animation-delay: 0.6s; }
+
+.birthday-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 30px;
+}
+
+.birthday-card {
+  background-color: white;
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+  transform: translateY(50px);
+  opacity: 0;
+  transition: transform 0.8s ease, opacity 0.8s ease, box-shadow 0.3s ease;
+}
+
+.birthday-card:hover {
+  box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+}
+
+.card-visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.card-theme-blue { border-top: 5px solid #4a90e2; }
+.card-theme-purple { border-top: 5px solid #9b59b6; }
+.card-theme-green { border-top: 5px solid #2ecc71; }
+.card-theme-orange { border-top: 5px solid #e67e22; }
+.card-theme-pink { border-top: 5px solid #e91e63; }
+
+.card-image {
+  height: 200px;
+  overflow: hidden;
+}
+
+.card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+
+.birthday-card:hover .card-image img {
+  transform: scale(1.05);
+}
+
+.card-content {
+  padding: 25px;
+  position: relative;
+}
+
+.confetti {
+  position: absolute;
+  top: -15px;
+  right: 15px;
+  display: flex;
+  gap: 5px;
+}
+
+.confetti span {
+  font-size: 1.2rem;
+  animation: spin 3s infinite;
+}
+
+.confetti span:nth-child(1) { animation-delay: 0s; }
+.confetti span:nth-child(2) { animation-delay: 0.5s; }
+.confetti span:nth-child(3) { animation-delay: 1s; }
+
+.card-content h3 {
+  font-size: 1.8rem;
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.card-message {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: #555;
+  margin-bottom: 20px;
+}
+
+.card-sender {
+  font-style: italic;
+  text-align: right;
+  color: #888;
+}
+
+.share-wish {
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 25px;
+  font-weight: 500;
+  margin-top: 15px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  width: 100%;
+}
+
+.share-wish:hover {
+  background-color: #3a80d2;
+}
+
+.create-wish-section {
+  margin-top: 50px;
+  text-align: center;
+  padding: 40px;
+  background-color: #f9f9f9;
+  border-radius: 15px;
+}
+
+.create-wish-section h2 {
+  font-size: 2rem;
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.create-wish-section p {
+  font-size: 1.1rem;
+  color: #666;
+  margin-bottom: 25px;
+}
+
+.create-wish-btn {
+  background-color: #e67e22;
+  color: white;
+  border: none;
+  padding: 12px 30px;
+  border-radius: 25px;
+  font-size: 1.1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.create-wish-btn:hover {
+  background-color: #d35400;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-15px); }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes gradientAnimation {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@media (max-width: 768px) {
+  .birthday-cards {
+    grid-template-columns: 1fr;
+  }
+  
+  .birthday-header h1 {
+    font-size: 2.5rem;
+  }
+}
+
+/* Add this class to body when popup is shown */
+.no-scroll {
+  overflow: hidden;
+  height: 100%;
+}
+
+/* Add a blur overlay when popups are active */
+.birthday-container {
+  position: relative;
+}
+
+/* Create an overlay element in your JSX */
+.blur-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 999;
+  transition: all 0.3s ease;
+}
+
+/* Ensure the popup has higher z-index than the overlay */
+.birthday-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  background-color: white;
+  padding: 25px 35px;
+  border-radius: 10px;
+  box-shadow: 0 5px 30px rgba(0,0,0,0.3);
+  z-index: 1000;
+  text-align: center;
+  animation: popIn 0.5s forwards;
+  transition: all 0.3s ease;
+}
+
+.second-popup {
+  background-color: #fff8dc;
+  border-left: 5px solid #ffc107;
+}
+
+.popup-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.popup-btn {
+  padding: 10px 25px;
+  border: none;
+  border-radius: 25px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.yes-btn {
+  background-color: #4caf50;
+  color: white;
+}
+
+.yes-btn:hover {
+  background-color: #388e3c;
+  transform: scale(1.05);
+}
+
+.no-btn {
+  background-color: #f5f5f5;
+  color: #333;
+}
+
+.no-btn:hover {
+  background-color: #e0e0e0;
+}
+
+@keyframes popIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

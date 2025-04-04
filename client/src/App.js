@@ -6,6 +6,7 @@ import Register from './pages/Register';
 import Friends from './pages/Friends';
 import Chat from './pages/Chat';
 import VideoCall from './pages/VideoCall';
+import BirthdayWish from './pages/BirthdayWish';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import { getCurrentUser } from './services/authService';
@@ -41,6 +42,7 @@ function App() {
               path="/register" 
               element={isAuthenticated() ? <Navigate to="/friends" /> : <Register />} 
             />
+            <Route path="/birthday" element={<BirthdayWish />} />
             
             {/* Protected routes */}
             <Route 

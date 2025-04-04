@@ -128,6 +128,66 @@ a {
   color: #666;
 }
 
+/* Birthday Wish Banner Styles */
+.birthday-wish-banner {
+  background: linear-gradient(135deg, #ffd3b6, #ffaaa5);
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 30px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  animation: pulse 2s infinite;
+}
+
+.birthday-icons {
+  font-size: 1.8rem;
+  display: block;
+  margin-bottom: 10px;
+}
+
+.birthday-wish-banner h3 {
+  font-size: 1.4rem;
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.btn-birthday {
+  background-color: #ff7b89;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  font-weight: 500;
+  border-radius: 25px;
+  box-shadow: 0 4px 8px rgba(255, 123, 137, 0.3);
+  transition: all 0.3s ease;
+}
+
+.btn-birthday:hover {
+  background-color: #ff5d6e;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(255, 123, 137, 0.5);
+}
+
+.feature-link {
+  display: inline-block;
+  margin-top: 10px;
+  color: #ff7b89;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.feature-link:hover {
+  color: #ff5d6e;
+  transform: translateX(5px);
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
 /* Responsive styles */
 @media (max-width: 768px) {
   .hero-section {

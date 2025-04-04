@@ -46,6 +46,10 @@ const Navbar = () => {
         </Link>
         
         <div className="nav-menu">
+          <Link to="/birthday" className="nav-item birthday-nav-item">
+            🎂 Birthday Wishes
+          </Link>
+          
           {!user ? (
             // Not logged in - show login/register links
             <>

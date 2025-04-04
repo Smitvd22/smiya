@@ -16,6 +16,14 @@ function Home() {
             Register
           </Link>
         </div>
+        
+        <div className="birthday-wish-banner">
+          <span className="birthday-icons">🎂 🎉 🎁</span>
+          <h3>Send Birthday Wishes to Your Loved Ones!</h3>
+          <Link to="/birthday" className="btn btn-birthday">
+            Create Birthday Wish
+          </Link>
+        </div>
       </div>
       
       <div className="features-section">
@@ -32,6 +40,11 @@ function Home() {
           <div className="feature-card">
             <h3>Secure Platform</h3>
             <p>Your privacy is our priority</p>
+          </div>
+          <div className="feature-card">
+            <h3>Birthday Wishes</h3>
+            <p>Send beautiful birthday cards to friends and family</p>
+            <Link to="/birthday" className="feature-link">Try it now →</Link>
           </div>
         </div>
       </div>
