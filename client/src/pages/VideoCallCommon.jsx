@@ -1,7 +1,8 @@
 // VideoCallCommon.jsx
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { getUserMedia, stopMediaStream } from '../utils/webrtc';
+// import { getUserMedia, stopMediaStream } from '../utils/webrtc';
+import { getUserMedia} from '../utils/webrtc';
 import { getCurrentUser } from '../services/authService';
 import { useCall } from '../contexts/CallContext';
 import '../styles/VideoCall.css';

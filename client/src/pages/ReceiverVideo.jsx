@@ -12,14 +12,14 @@ function ReceiverVideo() {
   
   const {
     stream,
-    setStream,
+    // setStream,
     callState,
     setCallState,
     callError,
     setCallError,
     isAudioEnabled,
     isVideoEnabled,
-    streamInitialized,
+    // streamInitialized,
     myVideo,
     userVideo,
     connectionRef,
