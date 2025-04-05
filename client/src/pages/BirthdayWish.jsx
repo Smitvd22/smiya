@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import '../styles/BirthdayWish.css';
 
 function BirthdayWish() {
@@ -7,88 +7,70 @@ function BirthdayWish() {
   const [visitedPopups, setVisitedPopups] = useState([0]);
   const [lines, setLines] = useState([]);
   const [showPopups, setShowPopups] = useState(false);
+  const [scale, setScale] = useState(1);
+  const [heartCompleted, setHeartCompleted] = useState(false);
+  const containerRef = useRef(null);
   
-  // Calculate 10 fixed positions along a heart shape with a better spread
+  // Calculate 10 fixed positions along a heart shape (for the heart path)
   const heartPositions = Array(10).fill(0).map((_, i) => {
     // Distribute points around the heart with better spacing
     // Start at top of heart (Math.PI/2) and go around
     const t = Math.PI / 2 + (i * ((2 * Math.PI) / 10));
-    const scale = 250; // Size of the heart
-    const adjustedX = 16 * Math.pow(Math.sin(t), 3) * (scale / 16);
-    const adjustedY = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) * (scale / 16);
+    const baseScale = 250; // Base size of the heart
+    const adjustedX = 16 * Math.pow(Math.sin(t), 3) * (baseScale / 16);
+    const adjustedY = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) * (baseScale / 16);
     return { x: adjustedX, y: adjustedY };
   });
   
-  // Calculate distinct positions outside the heart for popups with no overlapping
-  const popupPositions = Array(10).fill(0).map((_, i) => {
-    // Evenly distribute points around the heart with custom angle adjustments
-    // Add slight angle offsets to prevent overlapping for problematic positions
-    let angleOffset = 0;
-    if (i === 1) angleOffset = 0.15; // Push popup 1 slightly clockwise
-    if (i === 2) angleOffset = -0.1; // Push popup 2 slightly counterclockwise
-    if (i === 5) angleOffset = 0.15; // Push popup 5 slightly clockwise
-    if (i === 6) angleOffset = -0.1; // Push popup 6 slightly counterclockwise
-    
-    const t = Math.PI / 2 + (i * ((2 * Math.PI) / 10)) + angleOffset;
-    
-    // Calculate heart point
-    const scale = 250; // Same as heart scale
-    const heartX = 16 * Math.pow(Math.sin(t), 3) * (scale / 16);
-    const heartY = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) * (scale / 16);
-    
-    // Calculate normal vector (approximate)
-    const offset = 0.01;
-    const tOffset = t + offset;
-    const heartXOffset = 16 * Math.pow(Math.sin(tOffset), 3) * (scale / 16);
-    const heartYOffset = -(13 * Math.cos(tOffset) - 5 * Math.cos(2*tOffset) - 2 * Math.cos(3*tOffset) - Math.cos(4*tOffset)) * (scale / 16);
-    
-    // Get tangent vector and rotate 90 degrees to get normal
-    const tangentX = heartXOffset - heartX;
-    const tangentY = heartYOffset - heartY;
-    const normalX = -tangentY;
-    const normalY = tangentX;
-    
-    // Normalize the normal vector
-    const normalLength = Math.sqrt(normalX * normalX + normalY * normalY);
-    const normalizedX = normalX / normalLength;
-    const normalizedY = normalY / normalLength;
-    
-    // Set a distance pattern based on position to prevent overlapping
-    // First popup gets base distance, then we alternate to create more space
-    const baseDistance = 220; // Increased base distance from heart
-    
-    // Create a pattern to ensure good distribution - different distances for different positions
-    let distancePattern;
-    if (i === 0) distancePattern = baseDistance + 30; // Top
-    else if (i === 1) distancePattern = baseDistance + 70; // Upper right - push further out
-    else if (i === 2) distancePattern = baseDistance + 60; // Right upper
-    else if (i === 3) distancePattern = baseDistance + 40; // Right lower
-    else if (i === 4) distancePattern = baseDistance + 50; // Bottom right
-    else if (i === 5) distancePattern = baseDistance + 70; // Bottom left - push further out
-    else if (i === 6) distancePattern = baseDistance + 60; // Left lower
-    else if (i === 7) distancePattern = baseDistance + 40; // Left middle
-    else if (i === 8) distancePattern = baseDistance + 50; // Left upper
-    else distancePattern = baseDistance + 40; // Top left
-    
-    return {
-      x: heartX + normalizedX * distancePattern,
-      y: heartY + normalizedY * distancePattern
-    };
-  });
+  // Updated manual positions for 6 popups
+  const manualPopupPositions = [
+    { x: 280, y: -100 },    // 1
+    { x: -45, y: 270 },     // Merged 3 & 4
+    { x: -350, y: -100 },   // 6
+    { x: -175, y: -270 },   // 7
+    { x: -35, y: -90 },    // Merged 8 & 9
+    { x: 50, y: -320 }     // 10
+  ];
   
-  // Popup content for each step
+  // Calculate scaled positions for responsiveness
+  const popupPositions = manualPopupPositions.map(pos => ({
+    x: pos.x * scale,
+    y: pos.y * scale
+  }));
+  
+  // Updated popup content for 6 steps
   const popupContent = [
     { title: "1?", yesText: "Yes", noText: "No" },
     { title: "2?", yesText: "Yes", noText: "No" },
     { title: "3?", yesText: "Yes", noText: "No" },
     { title: "4?", yesText: "Yes", noText: "No" },
     { title: "5?", yesText: "Yes", noText: "No" },
-    { title: "6?", yesText: "Yes", noText: "No" },
-    { title: "7?", yesText: "Yes", noText: "No" },
-    { title: "8?", yesText: "Yes", noText: "No" },
-    { title: "9?", yesText: "Yes", noText: "No" },
-    { title: "10?", yesText: "Yes", noText: "No" }
+    { title: "6?", yesText: "Yes", noText: "No" }
   ];
+  
+  // Calculate responsive scale based on viewport size
+  useLayoutEffect(() => {
+    const updateScale = () => {
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const baseWidth = 1440; // Base design width
+      
+      // Calculate scale factors for width and height
+      const widthScale = viewportWidth / baseWidth;
+      const heightScale = viewportHeight / 800; // Assuming 800px base height
+      
+      // Use the smaller scale to ensure everything fits
+      const newScale = Math.min(widthScale, heightScale, 1);
+      setScale(Math.max(newScale, 0.5)); // Set minimum scale to 0.5
+    };
+    
+    // Initial calculation
+    updateScale();
+    
+    // Update on resize
+    window.addEventListener('resize', updateScale);
+    return () => window.removeEventListener('resize', updateScale);
+  }, []);
   
   // Prevent scrolling when popups are visible
   useEffect(() => {
@@ -112,8 +94,8 @@ function BirthdayWish() {
     return () => clearTimeout(timer);
   }, []);
   
+  // Card animations
   useEffect(() => {
-    // Add scroll animation for the cards
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -139,61 +121,59 @@ function BirthdayWish() {
   }, []);
   
   const handleYesClick = () => {
-    // Create a line from current popup to heart point and from heart point to next popup
-    if (activePopupIndex < 9) {
-      const currentPopupPos = popupPositions[activePopupIndex];
-      const currentHeartPos = heartPositions[activePopupIndex];
-      const nextHeartPos = heartPositions[activePopupIndex + 1];
-      const nextPopupPos = popupPositions[activePopupIndex + 1];
-      
-      // Line from current popup to current heart point
+    if (activePopupIndex < 5) {
+      // Add two heart segments per click
+      const start = activePopupIndex * 2;
+      const mid = (start + 1) % 10;
+      const end = (start + 2) % 10;
+
       setLines(prev => [
-        ...prev, 
+        ...prev,
         { 
-          x1: currentPopupPos.x, 
-          y1: currentPopupPos.y, 
-          x2: currentHeartPos.x, 
-          y2: currentHeartPos.y,
-          key: `line-${activePopupIndex}-heart-${activePopupIndex}`
+          x1: heartPositions[start].x,
+          y1: heartPositions[start].y,
+          x2: heartPositions[mid].x,
+          y2: heartPositions[mid].y,
+          key: `line-${start}-${mid}`
+        },
+        {
+          x1: heartPositions[mid].x,
+          y1: heartPositions[mid].y,
+          x2: heartPositions[end].x,
+          y2: heartPositions[end].y,
+          key: `line-${mid}-${end}`
         }
       ]);
-      
-      // Line along heart from current to next
-      setLines(prev => [
-        ...prev, 
-        { 
-          x1: currentHeartPos.x, 
-          y1: currentHeartPos.y, 
-          x2: nextHeartPos.x, 
-          y2: nextHeartPos.y,
-          key: `line-heart-${activePopupIndex}-${activePopupIndex + 1}`
-        }
-      ]);
-      
-      // Line from heart point to next popup
-      setLines(prev => [
-        ...prev, 
-        { 
-          x1: nextHeartPos.x, 
-          y1: nextHeartPos.y, 
-          x2: nextPopupPos.x, 
-          y2: nextPopupPos.y,
-          key: `line-heart-${activePopupIndex + 1}-popup-${activePopupIndex + 1}`
-        }
-      ]);
-      
-      // Move to next popup
+
       const nextIndex = activePopupIndex + 1;
       setActivePopupIndex(nextIndex);
       setVisitedPopups(prev => [...prev, nextIndex]);
     } else {
-      // Complete the journey
-      setShowPopups(false);
+      // Final click - complete heart
+      setHeartCompleted(true);
+      setTimeout(() => {
+        setShowPopups(false);
+        setHeartCompleted(false);
+      }, 3200); // Match total animation duration (2.1s + 1.0s + slight buffer)
     }
   };
   
   const handleNoClick = () => {
-    // Visual feedback for "No" click - could add a small shake animation
+    // Get reference to active popup
+    const popups = document.querySelectorAll('.birthday-popup');
+    const activePopup = Array.from(popups).find(popup => 
+      !popup.classList.contains('inactive-popup')
+    );
+    
+    if (activePopup) {
+      // Add shake class for animation
+      activePopup.classList.add('shake-animation');
+      
+      // Remove the class after animation completes
+      setTimeout(() => {
+        activePopup.classList.remove('shake-animation');
+      }, 500); // Duration matches the CSS animation
+    }
   };
 
   const birthdayCards = [
@@ -241,45 +221,42 @@ function BirthdayWish() {
   };
 
   return (
-    <div className="birthday-container">
+    <div className="birthday-container" ref={containerRef}>
       {/* Add blur overlay when popups are active */}
       {showPopups && (
         <>
           <div className="blur-overlay"></div>
           
-          {/* Render connecting lines between popups */}
-          <svg className="connection-lines" width="100%" height="100%" style={{ position: 'fixed', top: 0, left: 0, zIndex: 999, pointerEvents: 'none' }}>
+          {/* Render connecting lines between heart points */}
+          <svg className="connection-lines" width="100%" height="100%" style={{ position: 'fixed', top: 0, left: 0, zIndex: 1000, pointerEvents: 'none' }}>
             {lines.map((line) => (
               <line
                 key={line.key}
-                x1={`calc(50% + ${line.x1}px)`}
-                y1={`calc(50% + ${line.y1}px)`}
-                x2={`calc(50% + ${line.x2}px)`}
-                y2={`calc(50% + ${line.y2}px)`}
+                x1={`calc(50% + ${line.x1 * scale}px)`}
+                y1={`calc(50% + ${line.y1 * scale}px)`}
+                x2={`calc(50% + ${line.x2 * scale}px)`}
+                y2={`calc(50% + ${line.y2 * scale}px)`}
                 stroke="#ff69b4"
-                strokeWidth="3"
+                strokeWidth={3 * Math.max(scale, 0.5)}
                 strokeDasharray="5,5"
-                className="connection-line"
+                className={`connection-line ${heartCompleted ? 'heart-completed' : ''}`}
               />
             ))}
+            
+            {heartCompleted && (
+              <path
+                d="M50,15 C22,15 0,35 0,60 C0,75 10,90 30,105 C50,120 50,125 50,125 C50,125 50,120 70,105 C90,90 100,75 100,60 C100,35 78,15 50,15 Z"
+                fill="#ff69b4"
+                className="heart-fill"
+                style={{
+                  transform: `translate(calc(50% - 50px), calc(50% - 60px)) scale(${scale})`,
+                  transformOrigin: 'center center'
+                }}
+              />
+            )}
           </svg>
           
-          {/* Draw heart outline with dotted lines */}
-          <svg className="heart-outline" width="100%" height="100%" style={{ position: 'fixed', top: 0, left: 0, zIndex: 998, pointerEvents: 'none' }}>
-            <path
-              d={`M ${heartPositions.map((pos, i) => 
-                  i === 0 ? `calc(50% + ${pos.x}px) calc(50% + ${pos.y}px)` : 
-                  `L calc(50% + ${pos.x}px) calc(50% + ${pos.y}px)`
-                ).join(' ')} Z`}
-              stroke="#ff69b4"
-              strokeWidth="2"
-              strokeDasharray="5,5"
-              fill="none"
-              className="heart-path"
-            />
-          </svg>
-          
-          {/* Render all popups - show only visited ones with improved sizing */}
+          {/* Render all popups - show only visited ones */}
           {popupPositions.map((pos, index) => (
             visitedPopups.includes(index) && (
               <div
@@ -290,20 +267,33 @@ function BirthdayWish() {
                   top: `calc(50% + ${pos.y}px)`,
                   left: `calc(50% + ${pos.x}px)`,
                   transform: 'translate(-50%, -50%)',
-                  maxWidth: '250px', // Reduced width to prevent overlap
-                  zIndex: index === activePopupIndex ? 1002 : 1001 // Active popup gets higher z-index
+                  maxWidth: `${250 * scale}px`, 
+                  padding: `${20 * scale}px ${30 * scale}px`,
+                  fontSize: `${scale > 0.8 ? '1em' : '0.9em'}`,
+                  zIndex: index === activePopupIndex ? 1002 : 1001
                 }}
               >
                 <h3>{popupContent[index].title}</h3>
                 {index === activePopupIndex && (
-                  <div className="popup-buttons">
-                    <button className="popup-btn yes-btn" onClick={handleYesClick}>
-                      {popupContent[index].yesText}
-                    </button>
-                    <button className="popup-btn no-btn" onClick={handleNoClick}>
-                      {popupContent[index].noText}
-                    </button>
-                  </div>
+                  <>
+                    {index < 5 ? (
+                      <div className="popup-buttons">
+                        <button className="popup-btn yes-btn" onClick={handleYesClick}>
+                          {popupContent[index].yesText}
+                        </button>
+                        <button className="popup-btn no-btn" onClick={handleNoClick}>
+                          {popupContent[index].noText}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="popup-complete">
+                        <p>Heart complete! ❤️</p>
+                        <button className="popup-btn continue-btn" onClick={handleYesClick}>
+                          Continue
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )
