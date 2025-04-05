@@ -10,26 +10,84 @@ function BirthdayWish() {
   
   // Calculate 10 fixed positions along a heart shape with a better spread
   const heartPositions = Array(10).fill(0).map((_, i) => {
-    // Evenly distribute points around the heart
+    // Distribute points around the heart with better spacing
+    // Start at top of heart (Math.PI/2) and go around
     const t = Math.PI / 2 + (i * ((2 * Math.PI) / 10));
-    const scale = 250; // Increased scale to make the heart larger
+    const scale = 250; // Size of the heart
     const adjustedX = 16 * Math.pow(Math.sin(t), 3) * (scale / 16);
     const adjustedY = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) * (scale / 16);
     return { x: adjustedX, y: adjustedY };
   });
   
+  // Calculate distinct positions outside the heart for popups with no overlapping
+  const popupPositions = Array(10).fill(0).map((_, i) => {
+    // Evenly distribute points around the heart with custom angle adjustments
+    // Add slight angle offsets to prevent overlapping for problematic positions
+    let angleOffset = 0;
+    if (i === 1) angleOffset = 0.15; // Push popup 1 slightly clockwise
+    if (i === 2) angleOffset = -0.1; // Push popup 2 slightly counterclockwise
+    if (i === 5) angleOffset = 0.15; // Push popup 5 slightly clockwise
+    if (i === 6) angleOffset = -0.1; // Push popup 6 slightly counterclockwise
+    
+    const t = Math.PI / 2 + (i * ((2 * Math.PI) / 10)) + angleOffset;
+    
+    // Calculate heart point
+    const scale = 250; // Same as heart scale
+    const heartX = 16 * Math.pow(Math.sin(t), 3) * (scale / 16);
+    const heartY = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) * (scale / 16);
+    
+    // Calculate normal vector (approximate)
+    const offset = 0.01;
+    const tOffset = t + offset;
+    const heartXOffset = 16 * Math.pow(Math.sin(tOffset), 3) * (scale / 16);
+    const heartYOffset = -(13 * Math.cos(tOffset) - 5 * Math.cos(2*tOffset) - 2 * Math.cos(3*tOffset) - Math.cos(4*tOffset)) * (scale / 16);
+    
+    // Get tangent vector and rotate 90 degrees to get normal
+    const tangentX = heartXOffset - heartX;
+    const tangentY = heartYOffset - heartY;
+    const normalX = -tangentY;
+    const normalY = tangentX;
+    
+    // Normalize the normal vector
+    const normalLength = Math.sqrt(normalX * normalX + normalY * normalY);
+    const normalizedX = normalX / normalLength;
+    const normalizedY = normalY / normalLength;
+    
+    // Set a distance pattern based on position to prevent overlapping
+    // First popup gets base distance, then we alternate to create more space
+    const baseDistance = 220; // Increased base distance from heart
+    
+    // Create a pattern to ensure good distribution - different distances for different positions
+    let distancePattern;
+    if (i === 0) distancePattern = baseDistance + 30; // Top
+    else if (i === 1) distancePattern = baseDistance + 70; // Upper right - push further out
+    else if (i === 2) distancePattern = baseDistance + 60; // Right upper
+    else if (i === 3) distancePattern = baseDistance + 40; // Right lower
+    else if (i === 4) distancePattern = baseDistance + 50; // Bottom right
+    else if (i === 5) distancePattern = baseDistance + 70; // Bottom left - push further out
+    else if (i === 6) distancePattern = baseDistance + 60; // Left lower
+    else if (i === 7) distancePattern = baseDistance + 40; // Left middle
+    else if (i === 8) distancePattern = baseDistance + 50; // Left upper
+    else distancePattern = baseDistance + 40; // Top left
+    
+    return {
+      x: heartX + normalizedX * distancePattern,
+      y: heartY + normalizedY * distancePattern
+    };
+  });
+  
   // Popup content for each step
   const popupContent = [
-    { title: "Would you like to create a birthday wish?", yesText: "Yes", noText: "No" },
-    { title: "Would you like to see our special templates?", yesText: "Yes, please", noText: "Not now" },
-    { title: "Would you like to add a personal message?", yesText: "Of course", noText: "Skip this" },
-    { title: "Should we add some decorations?", yesText: "Yes, make it fancy", noText: "Keep it simple" },
-    { title: "Want to include a photo?", yesText: "Add photo", noText: "No photo" },
-    { title: "Would you like to schedule delivery?", yesText: "Schedule it", noText: "Send now" },
-    { title: "Would you like to include a gift card?", yesText: "Yes, add gift", noText: "No thanks" },
-    { title: "Would you like to share on social media?", yesText: "Share it", noText: "Keep private" },
-    { title: "Would you like to save this for later?", yesText: "Save it", noText: "Finish now" },
-    { title: "Want to create another wish?", yesText: "Create new", noText: "I'm done" }
+    { title: "1?", yesText: "Yes", noText: "No" },
+    { title: "2?", yesText: "Yes", noText: "No" },
+    { title: "3?", yesText: "Yes", noText: "No" },
+    { title: "4?", yesText: "Yes", noText: "No" },
+    { title: "5?", yesText: "Yes", noText: "No" },
+    { title: "6?", yesText: "Yes", noText: "No" },
+    { title: "7?", yesText: "Yes", noText: "No" },
+    { title: "8?", yesText: "Yes", noText: "No" },
+    { title: "9?", yesText: "Yes", noText: "No" },
+    { title: "10?", yesText: "Yes", noText: "No" }
   ];
   
   // Prevent scrolling when popups are visible
@@ -81,19 +139,46 @@ function BirthdayWish() {
   }, []);
   
   const handleYesClick = () => {
-    // Create a line from current popup to next popup
+    // Create a line from current popup to heart point and from heart point to next popup
     if (activePopupIndex < 9) {
-      const currentPos = heartPositions[activePopupIndex];
-      const nextPos = heartPositions[activePopupIndex + 1];
+      const currentPopupPos = popupPositions[activePopupIndex];
+      const currentHeartPos = heartPositions[activePopupIndex];
+      const nextHeartPos = heartPositions[activePopupIndex + 1];
+      const nextPopupPos = popupPositions[activePopupIndex + 1];
       
+      // Line from current popup to current heart point
       setLines(prev => [
         ...prev, 
         { 
-          x1: currentPos.x, 
-          y1: currentPos.y, 
-          x2: nextPos.x, 
-          y2: nextPos.y,
-          key: `line-${activePopupIndex}-${activePopupIndex + 1}`
+          x1: currentPopupPos.x, 
+          y1: currentPopupPos.y, 
+          x2: currentHeartPos.x, 
+          y2: currentHeartPos.y,
+          key: `line-${activePopupIndex}-heart-${activePopupIndex}`
+        }
+      ]);
+      
+      // Line along heart from current to next
+      setLines(prev => [
+        ...prev, 
+        { 
+          x1: currentHeartPos.x, 
+          y1: currentHeartPos.y, 
+          x2: nextHeartPos.x, 
+          y2: nextHeartPos.y,
+          key: `line-heart-${activePopupIndex}-${activePopupIndex + 1}`
+        }
+      ]);
+      
+      // Line from heart point to next popup
+      setLines(prev => [
+        ...prev, 
+        { 
+          x1: nextHeartPos.x, 
+          y1: nextHeartPos.y, 
+          x2: nextPopupPos.x, 
+          y2: nextPopupPos.y,
+          key: `line-heart-${activePopupIndex + 1}-popup-${activePopupIndex + 1}`
         }
       ]);
       
@@ -179,8 +264,23 @@ function BirthdayWish() {
             ))}
           </svg>
           
-          {/* Render all popups - show only visited ones */}
-          {heartPositions.map((pos, index) => (
+          {/* Draw heart outline with dotted lines */}
+          <svg className="heart-outline" width="100%" height="100%" style={{ position: 'fixed', top: 0, left: 0, zIndex: 998, pointerEvents: 'none' }}>
+            <path
+              d={`M ${heartPositions.map((pos, i) => 
+                  i === 0 ? `calc(50% + ${pos.x}px) calc(50% + ${pos.y}px)` : 
+                  `L calc(50% + ${pos.x}px) calc(50% + ${pos.y}px)`
+                ).join(' ')} Z`}
+              stroke="#ff69b4"
+              strokeWidth="2"
+              strokeDasharray="5,5"
+              fill="none"
+              className="heart-path"
+            />
+          </svg>
+          
+          {/* Render all popups - show only visited ones with improved sizing */}
+          {popupPositions.map((pos, index) => (
             visitedPopups.includes(index) && (
               <div
                 key={`popup-${index}`}
@@ -189,7 +289,9 @@ function BirthdayWish() {
                   position: 'fixed',
                   top: `calc(50% + ${pos.y}px)`,
                   left: `calc(50% + ${pos.x}px)`,
-                  transform: 'translate(-50%, -50%)'
+                  transform: 'translate(-50%, -50%)',
+                  maxWidth: '250px', // Reduced width to prevent overlap
+                  zIndex: index === activePopupIndex ? 1002 : 1001 // Active popup gets higher z-index
                 }}
               >
                 <h3>{popupContent[index].title}</h3>
