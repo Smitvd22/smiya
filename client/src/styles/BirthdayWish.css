@@ -50,23 +50,30 @@
   gap: 30px;
 }
 
+/* Update the birthday card styles */
+
 .birthday-card {
   background-color: white;
   border-radius: 15px;
   overflow: hidden;
   box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-  transform: translateY(50px);
-  opacity: 0;
-  transition: transform 0.8s ease, opacity 0.8s ease, box-shadow 0.3s ease;
+  transition: box-shadow 0.3s ease, opacity 0.05s linear;
+  will-change: transform, opacity;
 }
 
-.birthday-card:hover {
+/* Add styles for active cards */
+.birthday-card.card-active {
   box-shadow: 0 15px 30px rgba(0,0,0,0.2);
 }
 
-.card-visible {
-  transform: translateY(0);
-  opacity: 1;
+/* Left cards originate from right side (where dot is) */
+.left-item .birthday-card {
+  transform-origin: right center;
+}
+
+/* Right cards originate from left side (where dot is) */
+.right-item .birthday-card {
+  transform-origin: left center;
 }
 
 .card-theme-blue { border-top: 5px solid #4a90e2; }
@@ -268,13 +275,15 @@
 }
 
 .timeline-item .birthday-card {
-  transform: translateY(50px);
+  transform: scale(0.1);
   opacity: 0;
-  transition: transform 0.8s ease, opacity 0.8s ease, box-shadow 0.3s ease;
+  transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
+              opacity 0.8s ease, 
+              box-shadow 0.3s ease;
 }
 
 .timeline-item .card-visible {
-  transform: translateY(0);
+  transform: scale(1);
   opacity: 1;
 }
 
@@ -322,6 +331,10 @@
     left: 80px !important;
     right: auto !important;
     text-align: left !important;
+  }
+
+  .birthday-card {
+    transform-origin: left center !important;
   }
 }
 

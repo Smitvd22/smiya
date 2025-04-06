@@ -83,27 +83,55 @@ function BirthdayWish() {
   }, []);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('card-visible');
+    const handleScroll = () => {
+      requestAnimationFrame(() => {
+        const viewportHeight = window.innerHeight;
+        // const scrollPosition = window.scrollY;
+        
+        cards.current.forEach(card => {
+          // Get card's position relative to the viewport
+          const rect = card.getBoundingClientRect();
+          const cardCenter = rect.top + (rect.height / 2);
+          
+          // Calculate how far the card is from the optimal viewing position (center of screen)
+          const distanceFromCenter = Math.abs(cardCenter - viewportHeight / 2);
+          const maxDistance = viewportHeight * 0.8; // Max distance to consider
+          
+          // Calculate scale based on position (1 when centered, smaller as it moves away)
+          let scale;
+          
+          if (distanceFromCenter >= maxDistance) {
+            // Card is far from center - minimum scale (zoomed out)
+            scale = 0.1;
+          } else {
+            // Card is approaching center - gradually increase scale
+            // Use easeOutQuad formula for smoother transition
+            const progress = 1 - (distanceFromCenter / maxDistance);
+            scale = 0.1 + 0.9 * (progress * (2 - progress));
+          }
+          
+          // Apply the scale transform
+          card.style.transform = `scale(${scale})`;
+          card.style.opacity = Math.max(0, scale - 0.1) * 1.1; // Fade in as it scales
+          
+          // Set active state for fully visible cards
+          if (scale > 0.8) {
+            card.classList.add('card-active');
+          } else {
+            card.classList.remove('card-active');
           }
         });
-      },
-      { threshold: 0.3 }
-    );
-
-    const currentCards = [...cards.current];
-
-    currentCards.forEach((card) => {
-      observer.observe(card);
-    });
-
-    return () => {
-      currentCards.forEach((card) => {
-        if (card) observer.unobserve(card);
       });
+    };
+    
+    // Initial check
+    handleScroll();
+    
+    // Add scroll event listener
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
     };
   }, []);
 
@@ -204,12 +232,66 @@ function BirthdayWish() {
       image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176',
       message: 'Count your life by smiles, not tears. Count your age by friends, not years!',
       sender: 'With love from Smiya'
+    },
+    {
+      id: 6,
+      theme: 'pink',
+      date: 'December 5, 2023',
+      image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176',
+      message: 'Count your life by smiles, not tears. Count your age by friends, not years!',
+      sender: 'With love from Smiya'
+    },
+    {
+      id: 7,
+      theme: 'pink',
+      date: 'December 5, 2023',
+      image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176',
+      message: 'Count your life by smiles, not tears. Count your age by friends, not years!',
+      sender: 'With love from Smiya'
+    },
+    {
+      id: 8,
+      theme: 'pink',
+      date: 'December 5, 2023',
+      image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176',
+      message: 'Count your life by smiles, not tears. Count your age by friends, not years!',
+      sender: 'With love from Smiya'
+    },
+    {
+      id: 9,
+      theme: 'pink',
+      date: 'December 5, 2023',
+      image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176',
+      message: 'Count your life by smiles, not tears. Count your age by friends, not years!',
+      sender: 'With love from Smiya'
+    },
+    {
+      id: 10,
+      theme: 'pink',
+      date: 'December 5, 2023',
+      image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176',
+      message: 'Count your life by smiles, not tears. Count your age by friends, not years!',
+      sender: 'With love from Smiya'
     }
+    
   ];
 
   const addToRefs = (el) => {
     if (el && !cards.current.includes(el)) {
       cards.current.push(el);
+    }
+  };
+
+  const setCardTransformOrigin = (el, isLeftItem) => {
+    if (el) {
+      // Set initial state before any animations occur
+      el.classList.add('card-initial');
+      
+      // Add to refs for intersection observation
+      addToRefs(el);
+      
+      // Return the combined ref function
+      return el;
     }
   };
 
@@ -314,7 +396,7 @@ function BirthdayWish() {
             <div className="timeline-date">{card.date}</div>
             <div className="timeline-dot"></div>
             <div
-              ref={addToRefs}
+              ref={(el) => setCardTransformOrigin(el, index % 2 === 0)}
               className={`birthday-card card-theme-${card.theme}`}
             >
               <div className="card-image">
