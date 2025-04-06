@@ -10,7 +10,7 @@ function BirthdayWish() {
   const [scale, setScale] = useState(1);
   const [heartCompleted, setHeartCompleted] = useState(false);
   const containerRef = useRef(null);
-  
+
   // Calculate 10 fixed positions along a heart shape (for the heart path)
   const heartPositions = Array(10).fill(0).map((_, i) => {
     // Distribute points around the heart with better spacing
@@ -21,7 +21,7 @@ function BirthdayWish() {
     const adjustedY = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) * (baseScale / 16);
     return { x: adjustedX, y: adjustedY };
   });
-  
+
   // Updated manual positions for 6 popups
   const manualPopupPositions = [
     { x: 280, y: -100 },    // 1
@@ -31,13 +31,13 @@ function BirthdayWish() {
     { x: -35, y: -90 },    // Merged 8 & 9
     { x: 50, y: -320 }     // 10
   ];
-  
+
   // Calculate scaled positions for responsiveness
   const popupPositions = manualPopupPositions.map(pos => ({
     x: pos.x * scale,
     y: pos.y * scale
   }));
-  
+
   // Updated popup content for 6 steps
   const popupContent = [
     { title: "1?", yesText: "Yes", noText: "No" },
@@ -47,31 +47,31 @@ function BirthdayWish() {
     { title: "5?", yesText: "Yes", noText: "No" },
     { title: "6?", yesText: "Yes", noText: "No" }
   ];
-  
+
   // Calculate responsive scale based on viewport size
   useLayoutEffect(() => {
     const updateScale = () => {
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       const baseWidth = 1440; // Base design width
-      
+
       // Calculate scale factors for width and height
       const widthScale = viewportWidth / baseWidth;
       const heightScale = viewportHeight / 800; // Assuming 800px base height
-      
+
       // Use the smaller scale to ensure everything fits
       const newScale = Math.min(widthScale, heightScale, 1);
       setScale(Math.max(newScale, 0.5)); // Set minimum scale to 0.5
     };
-    
+
     // Initial calculation
     updateScale();
-    
+
     // Update on resize
     window.addEventListener('resize', updateScale);
     return () => window.removeEventListener('resize', updateScale);
   }, []);
-  
+
   // Prevent scrolling when popups are visible
   useEffect(() => {
     if (showPopups) {
@@ -79,21 +79,21 @@ function BirthdayWish() {
     } else {
       document.body.classList.remove('no-scroll');
     }
-    
+
     return () => {
       document.body.classList.remove('no-scroll');
     };
   }, [showPopups]);
-  
+
   // Show popups after a short delay
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowPopups(true);
     }, 1000);
-    
+
     return () => clearTimeout(timer);
   }, []);
-  
+
   // Card animations
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -106,20 +106,20 @@ function BirthdayWish() {
       },
       { threshold: 0.3 }
     );
-    
+
     const currentCards = [...cards.current];
-    
+
     currentCards.forEach((card) => {
       observer.observe(card);
     });
-    
+
     return () => {
       currentCards.forEach((card) => {
         if (card) observer.unobserve(card);
       });
     };
   }, []);
-  
+
   const handleYesClick = () => {
     if (activePopupIndex < 5) {
       // Add two heart segments per click
@@ -129,7 +129,7 @@ function BirthdayWish() {
 
       setLines(prev => [
         ...prev,
-        { 
+        {
           x1: heartPositions[start].x,
           y1: heartPositions[start].y,
           x2: heartPositions[mid].x,
@@ -157,18 +157,18 @@ function BirthdayWish() {
       }, 3200); // Match total animation duration (2.1s + 1.0s + slight buffer)
     }
   };
-  
+
   const handleNoClick = () => {
     // Get reference to active popup
     const popups = document.querySelectorAll('.birthday-popup');
-    const activePopup = Array.from(popups).find(popup => 
+    const activePopup = Array.from(popups).find(popup =>
       !popup.classList.contains('inactive-popup')
     );
-    
+
     if (activePopup) {
       // Add shake class for animation
       activePopup.classList.add('shake-animation');
-      
+
       // Remove the class after animation completes
       setTimeout(() => {
         activePopup.classList.remove('shake-animation');
@@ -213,7 +213,7 @@ function BirthdayWish() {
       sender: 'With love from Smiya'
     }
   ];
-  
+
   const addToRefs = (el) => {
     if (el && !cards.current.includes(el)) {
       cards.current.push(el);
@@ -226,7 +226,7 @@ function BirthdayWish() {
       {showPopups && (
         <>
           <div className="blur-overlay"></div>
-          
+
           {/* Render connecting lines between heart points */}
           <svg className="connection-lines" width="100%" height="100%" style={{ position: 'fixed', top: 0, left: 0, zIndex: 1000, pointerEvents: 'none' }}>
             {lines.map((line) => (
@@ -242,20 +242,21 @@ function BirthdayWish() {
                 className={`connection-line ${heartCompleted ? 'heart-completed' : ''}`}
               />
             ))}
-            
+
             {heartCompleted && (
-              <path
-                d="M50,15 C22,15 0,35 0,60 C0,75 10,90 30,105 C50,120 50,125 50,125 C50,125 50,120 70,105 C90,90 100,75 100,60 C100,35 78,15 50,15 Z"
-                fill="#ff69b4"
-                className="heart-fill"
-                style={{
-                  transform: `translate(calc(50% - 50px), calc(50% - 60px)) scale(${scale})`,
-                  transformOrigin: 'center center'
-                }}
-              />
+              <g transform={`translate(${window.innerWidth/2}, ${window.innerHeight/2})`}>
+                <path
+                  d={`M ${heartPositions[0].x * scale} ${heartPositions[0].y * scale}
+                      ${heartPositions.slice(1).map(point => `L ${point.x * scale} ${point.y * scale}`).join(' ')}
+                      Z`}
+                  fill="#ff69b4"
+                  className="heart-fill"
+                  style={{ transformOrigin: 'center' }}
+                />
+              </g>
             )}
           </svg>
-          
+
           {/* Render all popups - show only visited ones */}
           {popupPositions.map((pos, index) => (
             visitedPopups.includes(index) && (
@@ -267,7 +268,7 @@ function BirthdayWish() {
                   top: `calc(50% + ${pos.y}px)`,
                   left: `calc(50% + ${pos.x}px)`,
                   transform: 'translate(-50%, -50%)',
-                  maxWidth: `${250 * scale}px`, 
+                  maxWidth: `${250 * scale}px`,
                   padding: `${20 * scale}px ${30 * scale}px`,
                   fontSize: `${scale > 0.8 ? '1em' : '0.9em'}`,
                   zIndex: index === activePopupIndex ? 1002 : 1001
@@ -300,7 +301,7 @@ function BirthdayWish() {
           ))}
         </>
       )}
-      
+
       {/* The rest of your component remains the same */}
       <div className="birthday-header">
         <h1>Birthday Wishes</h1>
@@ -312,11 +313,11 @@ function BirthdayWish() {
           <span>🎈</span>
         </div>
       </div>
-      
+
       <div className="birthday-cards">
         {birthdayCards.map((card) => (
-          <div 
-            key={card.id} 
+          <div
+            key={card.id}
             ref={addToRefs}
             className={`birthday-card card-theme-${card.theme}`}
           >
@@ -337,7 +338,7 @@ function BirthdayWish() {
           </div>
         ))}
       </div>
-      
+
       <div className="create-wish-section">
         <h2>Create Your Own Birthday Wish</h2>
         <p>Customize a special birthday message for someone you care about</p>
