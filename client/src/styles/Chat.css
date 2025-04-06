@@ -149,3 +149,31 @@
   align-items: center;
   justify-content: center;
 }
+
+.media-button {
+  background-color: #2196f3;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.media-button:hover {
+  background-color: #0d8aee;
+}
+
+.connection-warning {
+  background-color: #fff3cd; 
+  color: #856404; 
+  padding: 8px 12px; 
+  border-radius: 4px;
+  margin: 8px 0;
+  text-align: center;
+}

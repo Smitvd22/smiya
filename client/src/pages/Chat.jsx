@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { getCurrentUser } from '../services/authService';
 import { useCall } from '../contexts/CallContext';
+import MediaUpload from '../components/MediaUpload';
+import MediaDisplay from '../components/MediaDisplay';
 import '../styles/Chat.css';
 
 function Chat() {
@@ -22,6 +24,8 @@ function Chat() {
   const [showConnectionWarning, setShowConnectionWarning] = useState(false);
   const [initialConnecting, setInitialConnecting] = useState(true);
   const [isScrollLocked, setIsScrollLocked] = useState(false); // New state for scroll locking
+  const [showMediaUpload, setShowMediaUpload] = useState(false); // New state for media upload
+
   const socketRef = useRef(socket);
   const hasJoinedRoom = useRef(false);
   
@@ -190,13 +194,6 @@ function Chat() {
     // Set initial connection state
     setSocketConnected(socket.connected);
     
-    // Only join if socket is connected and we haven't joined yet
-    if (socket.connected && !hasJoinedRoom.current) {
-      console.log(`Joining chat room: ${roomId}`);
-      socket.emit('join-room', roomId);
-      hasJoinedRoom.current = true;
-    }
-    
     const handleConnect = () => {
       console.log("Socket connected in Chat component");
       setSocketConnected(true);
@@ -204,7 +201,7 @@ function Chat() {
       
       // Only join room if we haven't already
       if (!hasJoinedRoom.current) {
-        console.log(`Joining chat room after reconnect: ${roomId}`);
+        console.log(`Joining chat room: ${roomId}`);
         socket.emit('join-room', roomId);
         hasJoinedRoom.current = true;
       }
@@ -218,6 +215,11 @@ function Chat() {
     
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
+    
+    // Call handleConnect immediately if already connected
+    if (socket.connected) {
+      handleConnect();
+    }
     
     return () => {
       socket.off('connect', handleConnect);
@@ -326,7 +328,43 @@ function Chat() {
       setError('Failed to send message');
     }
   };
-  
+
+  // New function to handle media upload success
+  const handleMediaUploadSuccess = async (mediaData) => {
+    try {
+      const currentUser = getCurrentUser();
+      if (!currentUser || !currentUser.token) {
+        setError('You need to be logged in');
+        return;
+      }
+      
+      const mediaMessage = {
+        mediaUrl: mediaData.url,
+        mediaType: mediaData.resourceType,
+        publicId: mediaData.publicId,
+        format: mediaData.format,
+        receiverId: friendId
+      };
+      
+      await axios.post(`${API_URL}/messages/media`, mediaMessage, {
+        headers: { Authorization: `Bearer ${currentUser.token}` }
+      });
+      
+      // Hide media upload component after successful upload
+      setShowMediaUpload(false);
+      
+      // Scroll to bottom after sending
+      setTimeout(() => {
+        if (messagesContainerRef.current) {
+          messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+        }
+      }, 300);
+    } catch (err) {
+      console.error('Error sending media message:', err);
+      setError('Failed to send media');
+    }
+  };
+
   // Call functions
   const initiateCall = () => {
     console.log('Initiating call to friend ID:', friendId);
@@ -334,7 +372,59 @@ function Chat() {
     // No need to set up a socket connection here as it's already handled by the context
     navigate('/videocall', { state: { recipientId: friendId } });
   };
-  
+
+  // Modified message rendering to include media display
+  const renderMessage = (message) => {
+    const isCurrentUser = message.senderId === getCurrentUser()?.id;
+    
+    // Log complete message data for debugging
+    console.log('Full message data:', message);
+    
+    // Check for missing media properties
+    if (message.mediaUrl === undefined && message.hasMedia) {
+      console.error('Message marked as having media but URL is missing:', message);
+    }
+    
+    return (
+      <div 
+        key={message.id} 
+        className={`message ${isCurrentUser ? 'sent' : 'received'}`}
+      >
+        {/* Show message content if any */}
+        {message.content && (
+          <div className="message-content">{message.content}</div>
+        )}
+        
+        {/* Improved media detection logic */}
+        {(message.mediaUrl || (message.hasMedia && !message.mediaUrl)) && (
+          <MediaDisplay 
+            media={{
+              url: message.mediaUrl || '',
+              resourceType: message.mediaType || 'image', 
+              publicId: message.mediaPublicId || '',
+              format: message.mediaFormat || '',
+              messageId: message.id
+            }}
+          />
+        )}
+        
+        <div className="message-time">
+          {new Date(message.createdAt).toLocaleTimeString([], { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  // Helper function for Chat.jsx
+  // const getFormatFromUrl = (url) => {
+  //   if (!url) return '';
+  //   const parts = url.split('.');
+  //   return parts.length > 1 ? parts[parts.length - 1].split('?')[0] : '';
+  // };
+
   return (
     <div className="chat-container">
       <div className="chat-header">
@@ -399,28 +489,26 @@ function Chat() {
         ) : messages.length === 0 ? (
           <div className="no-messages">No messages yet. Start a conversation!</div>
         ) : (
-          // Remove the reverse() to maintain the order where newest messages are at the bottom
-          messages.map((message) => {
-            const isCurrentUser = message.senderId === getCurrentUser()?.id;
-            return (
-              <div 
-                key={message.id} 
-                className={`message ${isCurrentUser ? 'sent' : 'received'}`}
-              >
-                <div className="message-content">{message.content}</div>
-                <div className="message-time">
-                  {new Date(message.createdAt).toLocaleTimeString([], { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                  })}
-                </div>
-              </div>
-            );
-          })
+          messages.map(renderMessage)
         )}
       </div>
       
+      {/* Media upload component */}
+      {showMediaUpload && (
+        <MediaUpload 
+          onUploadSuccess={handleMediaUploadSuccess}
+          onCancel={() => setShowMediaUpload(false)}
+        />
+      )}
+      
       <form className="message-form" onSubmit={sendMessage}>
+        <button 
+          type="button" 
+          className="media-button"
+          onClick={() => setShowMediaUpload(!showMediaUpload)}
+        >
+          {showMediaUpload ? '✕' : '+'}
+        </button>
         <input
           type="text"
           value={messageInput}

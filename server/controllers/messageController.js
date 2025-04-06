@@ -1,4 +1,5 @@
 import { pool } from '../config/db.js';
+import { v2 as cloudinary } from 'cloudinary';
 
 // Get chat history with a specific user (with pagination)
 export const getChatHistory = async (req, res) => {
@@ -27,6 +28,10 @@ export const getChatHistory = async (req, res) => {
       content: msg.content,
       senderId: msg.sender_id,
       receiverId: msg.receiver_id,
+      mediaUrl: msg.media_url,
+      mediaType: msg.media_type,
+      mediaPublicId: msg.media_public_id, 
+      mediaFormat: msg.media_format,
       createdAt: msg.created_at
     }));
     
@@ -61,6 +66,10 @@ export const sendMessage = async (req, res) => {
       content: result.rows[0].content,
       senderId: result.rows[0].sender_id,
       receiverId: result.rows[0].receiver_id,
+      mediaUrl: result.rows[0].media_url,
+      mediaType: result.rows[0].media_type,
+      mediaPublicId: result.rows[0].media_public_id,
+      mediaFormat: result.rows[0].media_format,
       createdAt: result.rows[0].created_at
     };
     
@@ -73,5 +82,46 @@ export const sendMessage = async (req, res) => {
   } catch (error) {
     console.error('Send message error:', error);
     res.status(500).json({ error: 'Failed to send message' });
+  }
+};
+
+// Send a media message
+export const sendMediaMessage = async (req, res) => {
+  const { mediaUrl, mediaType, publicId, format, receiverId } = req.body;
+  const senderId = req.user.userId;
+  
+  if (!mediaUrl || !mediaType || !receiverId) {
+    return res.status(400).json({ error: 'Media URL, type, and receiver ID are required' });
+  }
+  
+  try {
+    // Insert media message into database
+    const result = await pool.query(
+      `INSERT INTO messages (content, sender_id, receiver_id, media_url, media_type, media_public_id, media_format)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      ['', senderId, receiverId, mediaUrl, mediaType, publicId, format]
+    );
+    
+    const newMessage = {
+      id: result.rows[0].id,
+      content: result.rows[0].content,
+      senderId: result.rows[0].sender_id,
+      receiverId: result.rows[0].receiver_id,
+      mediaUrl: result.rows[0].media_url,
+      mediaType: result.rows[0].media_type,
+      mediaPublicId: result.rows[0].media_public_id,
+      mediaFormat: result.rows[0].media_format,
+      createdAt: result.rows[0].created_at
+    };
+    
+    // Emit to socket
+    const io = req.app.get('io');
+    const chatRoom = [senderId, receiverId].sort().join('-');
+    io.to(chatRoom).emit('new-message', newMessage);
+    
+    res.status(201).json(newMessage);
+  } catch (error) {
+    console.error('Send media message error:', error);
+    res.status(500).json({ error: 'Failed to send media message' });
   }
 };

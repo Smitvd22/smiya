@@ -1,0 +1,135 @@
+.media-display {
+  position: relative;
+  margin: 10px 0;
+  max-width: 100%;
+  min-height: 150px;  /* Ensure a minimum height for visibility */
+  overflow: hidden;
+  border-radius: 8px;
+  background-color: #f8f8f8;
+  border: 1px solid #ddd;  /* Always show a border */
+}
+
+/* Make sure images are properly displayed */
+.image-container {
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.image-container img {
+  max-width: 100%;
+  max-height: 300px;
+  object-fit: contain;
+}
+
+.video-container video {
+  max-width: 100%;
+  max-height: 300px;
+  display: block;
+  margin: 0 auto;
+}
+
+.audio-container {
+  padding: 10px;
+}
+
+.audio-container audio {
+  width: 100%;
+}
+
+.download-button {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background-color: rgba(33, 150, 243, 0.8);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.download-button:hover {
+  background-color: rgba(0, 0, 0, 0.8);
+}
+
+.media-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background-color: #f1f1f1;
+  color: #555;
+  min-height: 100px;
+}
+
+.media-error {
+  background-image: linear-gradient(45deg, #f8f8f8 25%, #eee 25%, #eee 50%, #f8f8f8 50%, #f8f8f8 75%, #eee 75%, #eee 100%);
+  background-size: 20px 20px;
+  padding: 15px;
+  color: #d32f2f;
+  text-align: center;
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.media-error button {
+  margin-top: 10px;
+  padding: 5px 15px;
+  background-color: #2196f3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.media-error button:hover {
+  background-color: #0d8aee;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-top-color: #2196f3;
+  border-radius: 50%;
+  animation: spin 1s ease-in-out infinite;
+  margin-right: 10px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.open-link {
+  display: block;
+  margin-top: 5px;
+  color: #1565c0;
+  text-decoration: underline;
+}
+
+/* Style for error details */
+.error-details {
+  display: block;
+  font-size: 0.8rem;
+  color: #888;
+  margin-top: 5px;
+}
+
+/* Make the media placeholder more visible */
+.media-placeholder {
+  background-color: #eee;
+  min-height: 150px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #aaa;
+  font-style: italic;
+}
+.media-placeholder::after {
+  content: "Loading media...";
+}
