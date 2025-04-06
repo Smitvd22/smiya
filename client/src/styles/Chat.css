@@ -41,6 +41,7 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  position: relative; /* For positioning the spinner */
 }
 
 .loading-messages, .no-messages {
@@ -120,4 +121,31 @@
   text-align: center;
   margin: 10px;
   border-radius: 4px;
+}
+
+.spinner {
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border-left-color: #2196f3;
+  animation: spin 1s linear infinite;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-more-messages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

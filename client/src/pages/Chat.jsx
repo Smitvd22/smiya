@@ -20,19 +20,22 @@ function Chat() {
   const [hasMore, setHasMore] = useState(true);
   const [socketConnected, setSocketConnected] = useState(false);
   const [showConnectionWarning, setShowConnectionWarning] = useState(false);
-  const [initialConnecting, setInitialConnecting] = useState(true); // Add this state
+  const [initialConnecting, setInitialConnecting] = useState(true);
+  const [isScrollLocked, setIsScrollLocked] = useState(false); // New state for scroll locking
   const socketRef = useRef(socket);
-  const hasJoinedRoom = useRef(false); // Add a ref to track if we've joined the room
+  const hasJoinedRoom = useRef(false);
   
-  const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
   const MESSAGES_PER_PAGE = 20;
   
-  // Function to fetch chat history with pagination
+  // Modified function to fetch chat history with pagination
   const fetchChatHistory = useCallback(async (pageNum = 1, append = false) => {
     try {
+      // Lock scrolling while loading messages
+      setIsScrollLocked(true);
+      
       const currentUser = getCurrentUser();
       if (!currentUser || !currentUser.token) return;
 
@@ -43,16 +46,45 @@ function Chat() {
         }
       );
       
+      // Get messages from response
       const fetchedMessages = response.data.messages || response.data;
       
       if (fetchedMessages.length < MESSAGES_PER_PAGE) {
         setHasMore(false);
       }
       
+      // For pagination: add NEW messages at BEGINNING of array (older messages)
       if (append) {
-        setMessages(prev => [...fetchedMessages, ...prev]);
+        // Save current scroll height before adding new messages
+        const prevHeight = messagesContainerRef.current?.scrollHeight || 0;
+        
+        setMessages(prev => {
+          const prevIds = new Set(prev.map(msg => msg.id));
+          const uniqueNewMessages = fetchedMessages.filter(msg => !prevIds.has(msg.id));
+          return [...uniqueNewMessages, ...prev]; // Prepend older messages
+        });
+        
+        // After adding new messages, adjust scroll position
+        setTimeout(() => {
+          if (messagesContainerRef.current && fetchedMessages.length > 0) {
+            // Calculate height of new content and set scroll position
+            const newTotalHeight = messagesContainerRef.current.scrollHeight;
+            const addedHeight = newTotalHeight - prevHeight;
+            messagesContainerRef.current.scrollTop = addedHeight;
+          }
+          setIsScrollLocked(false);
+        }, 100);
       } else {
+        // First load - just set messages
         setMessages(fetchedMessages);
+        
+        // For initial load, scroll to bottom after a brief delay
+        setTimeout(() => {
+          if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+          }
+          setIsScrollLocked(false);
+        }, 100);
       }
       
       setLoading(false);
@@ -62,6 +94,7 @@ function Chat() {
       setLoading(false);
       setLoadingMore(false);
       setError('Could not load chat history');
+      setIsScrollLocked(false);
     }
   }, [API_URL, friendId]);
   
@@ -116,32 +149,23 @@ function Chat() {
     
   }, [friendId, fetchFriendInfo, fetchChatHistory, navigate]);
   
-  // Handle scroll to load more messages
+  // Modified scroll handler to load older messages when scrolling to top
   const handleScroll = useCallback(() => {
-    if (!messagesContainerRef.current) return;
+    if (!messagesContainerRef.current || isScrollLocked) return;
     
     const { scrollTop } = messagesContainerRef.current;
     
-    // When user scrolls near the top, load more messages
-    if (scrollTop < 100 && !loadingMore && hasMore) {
+    // When user scrolls to TOP, load older messages
+    if (scrollTop < 50 && !loadingMore && hasMore) {
       setLoadingMore(true);
-      
-      // Store current scroll height to maintain position
-      const scrollHeight = messagesContainerRef.current.scrollHeight;
       
       // Load next page of messages
       const nextPage = page + 1;
       setPage(nextPage);
       
-      fetchChatHistory(nextPage, true).then(() => {
-        // After loading more messages, maintain scroll position
-        if (messagesContainerRef.current) {
-          const newScrollHeight = messagesContainerRef.current.scrollHeight;
-          messagesContainerRef.current.scrollTop = newScrollHeight - scrollHeight;
-        }
-      });
+      fetchChatHistory(nextPage, true);
     }
-  }, [fetchChatHistory, hasMore, loadingMore, page]);
+  }, [fetchChatHistory, hasMore, loadingMore, page, isScrollLocked]);
   
   useEffect(() => {
     const container = messagesContainerRef.current;
@@ -151,7 +175,7 @@ function Chat() {
     }
   }, [handleScroll]);
   
-  // Join chat room when component mounts or friendId/socket changes
+  // Socket connection management
   useEffect(() => {
     // Update socket ref
     socketRef.current = socket;
@@ -202,7 +226,7 @@ function Chat() {
     };
   }, [socket, friendId]);
   
-  // Listen for new messages
+  // Listen for new messages - modified to add at end of array
   useEffect(() => {
     if (!socket) return;
     
@@ -216,27 +240,26 @@ function Chat() {
         (message.senderId === parseInt(friendId) && message.receiverId === currentUser.id) || 
         (message.senderId === currentUser.id && message.receiverId === parseInt(friendId))
       ) {
+        // Add new message to the END of the array (newest at the end)
         setMessages(prev => [...prev, message]);
+        
+        // Scroll to bottom when new message arrives
+        setTimeout(() => {
+          if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+          }
+        }, 100);
       }
     };
     
-    // Add event listener
     socket.on('new-message', handleNewMessage);
     
-    // Remove event listener on cleanup
     return () => {
       socket.off('new-message', handleNewMessage);
     };
-  }, [friendId, socket]); // Both dependencies are needed
+  }, [friendId, socket]);
   
-  // Auto-scroll to bottom when new messages arrive from the current conversation
-  useEffect(() => {
-    if (messages.length > 0 && !loadingMore) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages, loadingMore]);
-  
-  // Add this new effect to handle the warning display with delay
+  // Warning display code
   useEffect(() => {
     let warningTimer;
     
@@ -260,6 +283,7 @@ function Chat() {
     };
   }, [socketConnected, initialConnecting]);
 
+  // Send message function - updated to scroll to bottom after sending
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!messageInput.trim()) return;
@@ -291,7 +315,12 @@ function Chat() {
       // Clear input after sending
       setMessageInput('');
       
-      // The socket will handle adding the new message to state
+      // After sending, scroll to bottom
+      setTimeout(() => {
+        if (messagesContainerRef.current) {
+          messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+        }
+      }, 300);
     } catch (err) {
       console.error('Error sending message:', err);
       setError('Failed to send message');
@@ -342,9 +371,23 @@ function Chat() {
       <div 
         className="messages-container" 
         ref={messagesContainerRef}
+        style={{ pointerEvents: isScrollLocked ? 'none' : 'auto' }}
       >
         {loadingMore && (
-          <div className="loading-more-messages">Loading earlier messages...</div>
+          <div className="loading-more-messages" style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            padding: '10px 15px',
+            backgroundColor: 'rgba(255, 255, 255, 0.8)',
+            borderRadius: '10px',
+            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
+            zIndex: 5
+          }}>
+            <div className="spinner"></div>
+            Loading more messages...
+          </div>
         )}
         
         {!hasMore && messages.length > 0 && (
@@ -356,6 +399,7 @@ function Chat() {
         ) : messages.length === 0 ? (
           <div className="no-messages">No messages yet. Start a conversation!</div>
         ) : (
+          // Remove the reverse() to maintain the order where newest messages are at the bottom
           messages.map((message) => {
             const isCurrentUser = message.senderId === getCurrentUser()?.id;
             return (
@@ -374,7 +418,6 @@ function Chat() {
             );
           })
         )}
-        <div ref={messagesEndRef} />
       </div>
       
       <form className="message-form" onSubmit={sendMessage}>
@@ -383,9 +426,9 @@ function Chat() {
           value={messageInput}
           onChange={(e) => setMessageInput(e.target.value)}
           placeholder="Type a message..."
-          disabled={loading}
+          disabled={loading || isScrollLocked}
         />
-        <button type="submit" disabled={!messageInput.trim() || loading}>
+        <button type="submit" disabled={!messageInput.trim() || loading || isScrollLocked}>
           Send
         </button>
       </form>
