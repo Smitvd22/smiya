@@ -11,6 +11,8 @@ function BirthdayWish() {
   const [heartCompleted, setHeartCompleted] = useState(false);
   const [showHeartAnimation, setShowHeartAnimation] = useState(false);
   const containerRef = useRef(null);
+  const [isMuted, setIsMuted] = useState(true); // Start muted for better UX
+  const videoRef = useRef(null);
 
   const heartPositions = Array(10).fill(0).map((_, i) => {
     const t = Math.PI / 2 + (i * ((2 * Math.PI) / 10));
@@ -134,6 +136,69 @@ function BirthdayWish() {
       window.removeEventListener('scroll', handleScroll);
     };
   }, []);
+
+  useEffect(() => {
+    // Attempt to play the video when component mounts
+    const videoElement = videoRef.current;
+    
+    if (videoElement) {
+      // Set volume to ensure it's not at zero
+      videoElement.volume = 0.5;
+      
+      // Log info about audio tracks
+      console.log('Audio tracks:', videoElement.audioTracks ? videoElement.audioTracks.length : 'not supported');
+      
+      const playPromise = videoElement.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('Background video playback started');
+          })
+          .catch(error => {
+            console.warn('Auto-play was prevented:', error);
+            setIsMuted(true); // Ensure muted if autoplay was blocked
+          });
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (videoElement) {
+      videoElement.muted = isMuted;
+      
+      // Log the current state to help debug
+      console.log(`Video muted state: ${videoElement.muted}, isMuted state: ${isMuted}`);
+      
+      // If unmuting, ensure volume is not zero
+      if (!isMuted) {
+        videoElement.volume = 0.5;
+      }
+    }
+  }, [isMuted]);
+
+  const toggleSound = () => {
+    const newMutedState = !isMuted;
+    setIsMuted(newMutedState);
+    
+    const videoElement = videoRef.current;
+    if (videoElement) {
+      videoElement.muted = newMutedState;
+      
+      // When unmuting, we need to make sure user interaction is registered
+      if (!newMutedState) {
+        const playPromise = videoElement.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.error("Error unmuting video:", error);
+            // If unmuting fails, revert to muted
+            setIsMuted(true);
+          });
+        }
+      }
+    }
+  };
 
   const handleYesClick = () => {
     if (activePopupIndex < 5) {
@@ -297,6 +362,34 @@ function BirthdayWish() {
 
   return (
     <div className="birthday-container" ref={containerRef}>
+      <div className="video-background">
+        <video
+          ref={videoRef}
+          autoPlay
+          loop
+          muted={isMuted}
+          playsInline
+        >
+          <source src="/videos/birthday-background.mp4" type="video/mp4" />
+          Your browser does not support video backgrounds.
+        </video>
+      </div>
+      
+      <button 
+        className="sound-toggle"
+        onClick={toggleSound}
+        aria-label={isMuted ? "Unmute background music" : "Mute background music"}
+        style={{ 
+          zIndex: 1003,
+          position: "fixed",
+          bottom: "20px",
+          left: "20px",
+          pointerEvents: "auto" // Explicitly set pointer events
+        }}
+      >
+        {isMuted ? '🔇' : '🔊'}
+      </button>
+
       {(showPopups || showHeartAnimation) && (
         <>
           <div className="blur-overlay"></div>
