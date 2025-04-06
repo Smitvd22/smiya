@@ -19,7 +19,10 @@ function Chat() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [socketConnected, setSocketConnected] = useState(false);
+  const [showConnectionWarning, setShowConnectionWarning] = useState(false);
+  const [initialConnecting, setInitialConnecting] = useState(true); // Add this state
   const socketRef = useRef(socket);
+  const hasJoinedRoom = useRef(false); // Add a ref to track if we've joined the room
   
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -150,17 +153,54 @@ function Chat() {
   
   // Join chat room when component mounts or friendId/socket changes
   useEffect(() => {
-    if (!socket) return;
+    // Update socket ref
+    socketRef.current = socket;
+    
+    if (!socket || !friendId) return;
     
     const currentUser = getCurrentUser();
     if (!currentUser) return;
     
-    // Join chat room to receive messages
     const roomId = [currentUser.id, friendId].sort().join('-');
-    console.log(`Joining chat room: ${roomId}`);
-    socket.emit('join-room', roomId);
     
-  }, [friendId, socket]); // Both dependencies are needed
+    // Set initial connection state
+    setSocketConnected(socket.connected);
+    
+    // Only join if socket is connected and we haven't joined yet
+    if (socket.connected && !hasJoinedRoom.current) {
+      console.log(`Joining chat room: ${roomId}`);
+      socket.emit('join-room', roomId);
+      hasJoinedRoom.current = true;
+    }
+    
+    const handleConnect = () => {
+      console.log("Socket connected in Chat component");
+      setSocketConnected(true);
+      setInitialConnecting(false);
+      
+      // Only join room if we haven't already
+      if (!hasJoinedRoom.current) {
+        console.log(`Joining chat room after reconnect: ${roomId}`);
+        socket.emit('join-room', roomId);
+        hasJoinedRoom.current = true;
+      }
+    };
+
+    const handleDisconnect = () => {
+      console.log("Socket disconnected in Chat component");
+      setSocketConnected(false);
+      hasJoinedRoom.current = false; // Reset flag on disconnect
+    };
+    
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+    
+    return () => {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+      hasJoinedRoom.current = false;
+    };
+  }, [socket, friendId]);
   
   // Listen for new messages
   useEffect(() => {
@@ -196,46 +236,29 @@ function Chat() {
     }
   }, [messages, loadingMore]);
   
+  // Add this new effect to handle the warning display with delay
   useEffect(() => {
-    // Update the ref when socket changes
-    socketRef.current = socket;
+    let warningTimer;
     
-    if (!socket) {
-      console.error("Socket is not available from context");
-      setSocketConnected(false);
-      return;
-    }
-
-    setSocketConnected(socket.connected);
-
-    const handleConnect = () => {
-      console.log("Socket connected in Chat component");
-      setSocketConnected(true);
+    // Only show warning if we're not in initial connecting phase
+    if (!socketConnected && !initialConnecting) {
+      // Add delay before showing the warning to allow time for connection
+      warningTimer = setTimeout(() => {
+        setShowConnectionWarning(true);
+      }, 2000); // 2 second delay
+    } else {
+      setShowConnectionWarning(false);
       
-      // Re-join chat room on reconnection
-      if (friendId) {
-        const currentUser = getCurrentUser();
-        if (currentUser) {
-          const roomId = [currentUser.id, friendId].sort().join('-');
-          console.log(`Rejoining chat room after reconnect: ${roomId}`);
-          socket.emit('join-room', roomId);
-        }
+      // If we connected for the first time, no longer in initial connecting phase
+      if (socketConnected) {
+        setInitialConnecting(false);
       }
-    };
-
-    const handleDisconnect = () => {
-      console.log("Socket disconnected in Chat component");
-      setSocketConnected(false);
-    };
-
-    socket.on('connect', handleConnect);
-    socket.on('disconnect', handleDisconnect);
-
+    }
+    
     return () => {
-      socket.off('connect', handleConnect);
-      socket.off('disconnect', handleDisconnect);
+      if (warningTimer) clearTimeout(warningTimer);
     };
-  }, [socket, friendId]);
+  }, [socketConnected, initialConnecting]);
 
   const sendMessage = async (e) => {
     e.preventDefault();
@@ -303,7 +326,7 @@ function Chat() {
       
       {error && <div className="error-message">{error}</div>}
       
-      {!socketConnected && (
+      {showConnectionWarning && !socketConnected && (
         <div className="connection-warning" style={{
           backgroundColor: "#fff3cd", 
           color: "#856404", 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { getCurrentUser, logout } from '../services/authService';
 import '../styles/Navbar.css';
 
@@ -8,7 +8,7 @@ const Navbar = () => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [visible, setVisible] = useState(true);
   const [prevScrollPos, setPrevScrollPos] = useState(0);
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
   const location = useLocation();
 
   // Update user state when location changes or component mounts
@@ -52,10 +52,14 @@ const Navbar = () => {
   }, [prevScrollPos]);
 
   const handleLogout = () => {
+    // Clear user data
     logout();
     setUser(null);
     setShowDropdown(false);
-    navigate('/');
+    
+    // Force a complete page refresh when navigating to homepage
+    // This ensures all components are freshly mounted
+    window.location.href = '/';
   };
 
   return (
@@ -73,7 +77,6 @@ const Navbar = () => {
           {!user ? (
             // Not logged in - show login/register links
             <>
-              <Link to="/" className="nav-item">Home</Link>
               <Link to="/login" className="nav-item">Login</Link>
               <Link to="/register" className="nav-item">Register</Link>
             </>

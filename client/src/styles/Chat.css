@@ -3,7 +3,7 @@
   flex-direction: column;
   height: 90vh;
   max-width: 800px;
-  margin: 0 auto;
+  margin: 80px auto 0; /* Added top margin to push below navbar */
   background-color: white;
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);

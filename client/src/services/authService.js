@@ -1,4 +1,8 @@
 import axios from 'axios';
+import io from 'socket.io-client';
+
+// Singleton pattern for socket management
+let socket = null;
 
 // Fix URL and ensure correct endpoints
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
@@ -48,6 +52,9 @@ export const login = async (identifier, password) => {
       localStorage.setItem('user', JSON.stringify(authData));
     }
     
+    // Initialize socket immediately after successful login
+    initializeSocket();
+    
     return response.data;
   } catch (error) {
     console.error('Login error:', error);
@@ -56,6 +63,13 @@ export const login = async (identifier, password) => {
 };
 
 export const logout = () => {
+  // Clean up socket connection before removing user
+  if (socket) {
+    console.log('Cleaning up socket on logout');
+    socket.disconnect();
+    socket = null;
+  }
+  
   localStorage.removeItem('user');
 };
 
@@ -81,4 +95,53 @@ export const getCurrentUser = () => {
     console.error('Error getting current user:', error);
     return null;
   }
+};
+
+// Update the initializeSocket function to include a debug parameter
+export const initializeSocket = (debug = false) => {
+  // If socket exists and is connected, return it
+  if (socket && socket.connected) {
+    if (debug) console.log('Reusing existing socket connection:', socket.id);
+    return socket;
+  }
+  
+  // If socket exists but is disconnected, clean it up
+  if (socket) {
+    console.log('Cleaning up disconnected socket');
+    socket.disconnect();
+    socket = null;
+  }
+  
+  const user = getCurrentUser();
+  if (!user) return null;
+  
+  console.log('Creating new socket connection');
+  socket = io(process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000', {
+    reconnection: true,
+    reconnectionAttempts: 5,
+    transports: ['websocket'],
+    auth: { userId: user.id } // Add authentication data
+  });
+  
+  socket.on('connect', () => {
+    console.log('Socket connected:', socket.id);
+    // Join user's room immediately but only once
+    socket.emit('join-user-room', `user-${user.id}`);
+  });
+  
+  // Only log once in authService
+  socket.on('disconnect', () => {
+    console.log('Socket disconnected');
+  });
+  
+  socket.on('connect_error', (error) => {
+    console.error('Socket connection error:', error);
+  });
+  
+  return socket;
+};
+
+// Add a getter to access the current socket instance
+export const getSocket = () => {
+  return socket;
 };

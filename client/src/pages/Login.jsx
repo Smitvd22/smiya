@@ -12,14 +12,20 @@ function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Check if user is already logged in
+  // Reset component state when mounted
   useEffect(() => {
+    // This will force the component to reset on mount and when location changes
+    setIdentifier('');
+    setPassword('');
+    setError('');
+    setLoading(false);
+    setSuccess('');
+    
     const user = getCurrentUser();
     if (user) {
-      // If already logged in, redirect to Friends page
       navigate('/friends');
     }
-  }, [navigate]);
+  }, [navigate, location.search]); // Add location.search to dependencies
 
   // Check if user was redirected after registration or from a protected route
   useEffect(() => {
