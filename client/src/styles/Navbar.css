@@ -5,9 +5,21 @@
   justify-content: center;
   align-items: center;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  position: sticky;
+  position: fixed; /* Changed from sticky to fixed */
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 999;
+  transition: transform 0.3s ease; /* Add transition for smooth animation */
+}
+
+/* Add these new classes for showing/hiding the navbar */
+.navbar-visible {
+  transform: translateY(0);
+}
+
+.navbar-hidden {
+  transform: translateY(-100%);
 }
 
 .navbar-container {

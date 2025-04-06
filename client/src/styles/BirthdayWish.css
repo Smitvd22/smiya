@@ -76,7 +76,7 @@
 .card-theme-pink { border-top: 5px solid #e91e63; }
 
 .card-image {
-  height: 200px;
+  height: 250px; /* Increased height */
   overflow: hidden;
 }
 
@@ -185,6 +185,99 @@
   background-color: #d35400;
 }
 
+/* Timeline styling */
+.birthday-timeline {
+  position: relative;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 0;
+}
+
+.timeline-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 4px;
+  background: linear-gradient(180deg, #ff7b89, #8a5082, #6f5980, #3c6997);
+  transform: translateX(-50%);
+}
+
+.timeline-item {
+  position: relative;
+  margin-bottom: 80px;
+  width: 100%;
+  display: flex;
+}
+
+.timeline-item:last-child {
+  margin-bottom: 0;
+}
+
+.left-item {
+  justify-content: flex-end;
+  padding-right: calc(50% + 30px);
+}
+
+.right-item {
+  justify-content: flex-start;
+  padding-left: calc(50% + 30px);
+}
+
+.timeline-dot {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  background-color: #ff7b89;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  border: 4px solid white;
+  box-shadow: 0 0 0 4px rgba(255, 123, 137, 0.3);
+}
+
+/* Update timeline date position styling */
+.timeline-date {
+  position: absolute;
+  top: 60px;
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #555;
+  transform: translateY(-50%);
+  background-color: white;
+  padding: 5px 10px;
+  border-radius: 20px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  z-index: 3;
+}
+
+/* When card is on left, date appears on right side of timeline */
+.left-item .timeline-date {
+  left: calc(50% + 40px);
+  right: auto;
+  text-align: left;
+}
+
+/* When card is on right, date appears on left side of timeline */
+.right-item .timeline-date {
+  right: calc(50% + 40px);
+  left: auto;
+  text-align: right;
+}
+
+.timeline-item .birthday-card {
+  transform: translateY(50px);
+  opacity: 0;
+  transition: transform 0.8s ease, opacity 0.8s ease, box-shadow 0.3s ease;
+}
+
+.timeline-item .card-visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
 @keyframes bounce {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-15px); }
@@ -208,6 +301,27 @@
   
   .birthday-header h1 {
     font-size: 2.5rem;
+  }
+
+  .timeline-line {
+    left: 30px;
+  }
+  
+  .timeline-item {
+    padding-left: 80px !important;
+    padding-right: 0 !important;
+    justify-content: flex-start !important;
+  }
+  
+  .timeline-dot {
+    left: 30px;
+  }
+  
+  .timeline-date {
+    /* For all items on mobile, position date to the right of the line */
+    left: 80px !important;
+    right: auto !important;
+    text-align: left !important;
   }
 }
 

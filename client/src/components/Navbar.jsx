@@ -6,6 +6,8 @@ import '../styles/Navbar.css';
 const Navbar = () => {
   const [user, setUser] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [visible, setVisible] = useState(true);
+  const [prevScrollPos, setPrevScrollPos] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -31,6 +33,24 @@ const Navbar = () => {
     };
   }, [location.pathname]);
 
+  // Handle scroll events to show/hide navbar
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollPos = window.scrollY;
+      
+      // Make navbar visible when scrolling up or at the top
+      setVisible((prevScrollPos > currentScrollPos) || currentScrollPos < 10);
+      
+      setPrevScrollPos(currentScrollPos);
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [prevScrollPos]);
+
   const handleLogout = () => {
     logout();
     setUser(null);
@@ -39,7 +59,7 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="navbar">
+    <nav className={`navbar ${visible ? 'navbar-visible' : 'navbar-hidden'}`}>
       <div className="navbar-container">
         <Link to="/" className="navbar-logo">
           Smiya

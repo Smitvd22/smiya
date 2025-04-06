@@ -9,36 +9,31 @@ function BirthdayWish() {
   const [showPopups, setShowPopups] = useState(false);
   const [scale, setScale] = useState(1);
   const [heartCompleted, setHeartCompleted] = useState(false);
+  const [showHeartAnimation, setShowHeartAnimation] = useState(false);
   const containerRef = useRef(null);
 
-  // Calculate 10 fixed positions along a heart shape (for the heart path)
   const heartPositions = Array(10).fill(0).map((_, i) => {
-    // Distribute points around the heart with better spacing
-    // Start at top of heart (Math.PI/2) and go around
     const t = Math.PI / 2 + (i * ((2 * Math.PI) / 10));
-    const baseScale = 250; // Base size of the heart
+    const baseScale = 250;
     const adjustedX = 16 * Math.pow(Math.sin(t), 3) * (baseScale / 16);
     const adjustedY = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) * (baseScale / 16);
     return { x: adjustedX, y: adjustedY };
   });
 
-  // Updated manual positions for 6 popups
   const manualPopupPositions = [
-    { x: 280, y: -100 },    // 1
-    { x: -45, y: 270 },     // Merged 3 & 4
-    { x: -350, y: -100 },   // 6
-    { x: -175, y: -270 },   // 7
-    { x: -35, y: -90 },    // Merged 8 & 9
-    { x: 50, y: -320 }     // 10
+    { x: 280, y: -100 },
+    { x: -45, y: 270 },
+    { x: -350, y: -100 },
+    { x: -175, y: -270 },
+    { x: -35, y: -90 },
+    { x: 50, y: -320 }
   ];
 
-  // Calculate scaled positions for responsiveness
   const popupPositions = manualPopupPositions.map(pos => ({
     x: pos.x * scale,
     y: pos.y * scale
   }));
 
-  // Updated popup content for 6 steps
   const popupContent = [
     { title: "1?", yesText: "Yes", noText: "No" },
     { title: "2?", yesText: "Yes", noText: "No" },
@@ -48,31 +43,25 @@ function BirthdayWish() {
     { title: "6?", yesText: "Yes", noText: "No" }
   ];
 
-  // Calculate responsive scale based on viewport size
   useLayoutEffect(() => {
     const updateScale = () => {
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
-      const baseWidth = 1440; // Base design width
+      const baseWidth = 1440;
 
-      // Calculate scale factors for width and height
       const widthScale = viewportWidth / baseWidth;
-      const heightScale = viewportHeight / 800; // Assuming 800px base height
+      const heightScale = viewportHeight / 800;
 
-      // Use the smaller scale to ensure everything fits
       const newScale = Math.min(widthScale, heightScale, 1);
-      setScale(Math.max(newScale, 0.5)); // Set minimum scale to 0.5
+      setScale(Math.max(newScale, 0.5));
     };
 
-    // Initial calculation
     updateScale();
 
-    // Update on resize
     window.addEventListener('resize', updateScale);
     return () => window.removeEventListener('resize', updateScale);
   }, []);
 
-  // Prevent scrolling when popups are visible
   useEffect(() => {
     if (showPopups) {
       document.body.classList.add('no-scroll');
@@ -85,7 +74,6 @@ function BirthdayWish() {
     };
   }, [showPopups]);
 
-  // Show popups after a short delay
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowPopups(true);
@@ -94,7 +82,6 @@ function BirthdayWish() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Card animations
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -122,7 +109,6 @@ function BirthdayWish() {
 
   const handleYesClick = () => {
     if (activePopupIndex < 5) {
-      // Add two heart segments per click
       const start = activePopupIndex * 2;
       const mid = (start + 1) % 10;
       const end = (start + 2) % 10;
@@ -149,30 +135,32 @@ function BirthdayWish() {
       setActivePopupIndex(nextIndex);
       setVisitedPopups(prev => [...prev, nextIndex]);
     } else {
-      // Final click - complete heart
-      setHeartCompleted(true);
+      setShowPopups(false);
+      setShowHeartAnimation(true);
+
       setTimeout(() => {
-        setShowPopups(false);
-        setHeartCompleted(false);
-      }, 3200); // Match total animation duration (2.1s + 1.0s + slight buffer)
+        setHeartCompleted(true);
+
+        setTimeout(() => {
+          setHeartCompleted(false);
+          setShowHeartAnimation(false);
+        }, 3200);
+      }, 100);
     }
   };
 
   const handleNoClick = () => {
-    // Get reference to active popup
     const popups = document.querySelectorAll('.birthday-popup');
     const activePopup = Array.from(popups).find(popup =>
       !popup.classList.contains('inactive-popup')
     );
 
     if (activePopup) {
-      // Add shake class for animation
       activePopup.classList.add('shake-animation');
 
-      // Remove the class after animation completes
       setTimeout(() => {
         activePopup.classList.remove('shake-animation');
-      }, 500); // Duration matches the CSS animation
+      }, 500);
     }
   };
 
@@ -180,6 +168,7 @@ function BirthdayWish() {
     {
       id: 1,
       theme: 'blue',
+      date: 'May 12, 2023',
       image: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d',
       message: 'May your birthday be as wonderful and unique as you are!',
       sender: 'Your Smiya Friends'
@@ -187,6 +176,7 @@ function BirthdayWish() {
     {
       id: 2,
       theme: 'purple',
+      date: 'June 23, 2023',
       image: 'https://images.unsplash.com/photo-1611048661702-7b55eed346b4',
       message: 'Another year of amazing adventures awaits you. Happy Birthday!',
       sender: 'The Smiya Team'
@@ -194,6 +184,7 @@ function BirthdayWish() {
     {
       id: 3,
       theme: 'green',
+      date: 'August 4, 2023',
       image: 'https://images.unsplash.com/photo-1612540139150-4c5f872a2cd3',
       message: 'Wishing you a day filled with happiness and a year filled with joy!',
       sender: 'Your Smiya Family'
@@ -201,6 +192,7 @@ function BirthdayWish() {
     {
       id: 4,
       theme: 'orange',
+      date: 'October 17, 2023',
       image: 'https://images.unsplash.com/photo-1558301211-0d8c8ddee6ec',
       message: 'May today be the start of a wonderful, glorious and joyful year to come.',
       sender: 'Everyone at Smiya'
@@ -208,6 +200,7 @@ function BirthdayWish() {
     {
       id: 5,
       theme: 'pink',
+      date: 'December 5, 2023',
       image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176',
       message: 'Count your life by smiles, not tears. Count your age by friends, not years!',
       sender: 'With love from Smiya'
@@ -222,12 +215,10 @@ function BirthdayWish() {
 
   return (
     <div className="birthday-container" ref={containerRef}>
-      {/* Add blur overlay when popups are active */}
-      {showPopups && (
+      {(showPopups || showHeartAnimation) && (
         <>
           <div className="blur-overlay"></div>
 
-          {/* Render connecting lines between heart points */}
           <svg className="connection-lines" width="100%" height="100%" style={{ position: 'fixed', top: 0, left: 0, zIndex: 1000, pointerEvents: 'none' }}>
             {lines.map((line) => (
               <line
@@ -257,8 +248,7 @@ function BirthdayWish() {
             )}
           </svg>
 
-          {/* Render all popups - show only visited ones */}
-          {popupPositions.map((pos, index) => (
+          {showPopups && popupPositions.map((pos, index) => (
             visitedPopups.includes(index) && (
               <div
                 key={`popup-${index}`}
@@ -302,7 +292,6 @@ function BirthdayWish() {
         </>
       )}
 
-      {/* The rest of your component remains the same */}
       <div className="birthday-header">
         <h1>Birthday Wishes</h1>
         <p>Send beautiful birthday wishes to your friends and family</p>
@@ -314,26 +303,33 @@ function BirthdayWish() {
         </div>
       </div>
 
-      <div className="birthday-cards">
-        {birthdayCards.map((card) => (
-          <div
-            key={card.id}
-            ref={addToRefs}
-            className={`birthday-card card-theme-${card.theme}`}
+      <div className="birthday-timeline">
+        <div className="timeline-line"></div>
+        
+        {birthdayCards.map((card, index) => (
+          <div 
+            key={card.id} 
+            className={`timeline-item ${index % 2 === 0 ? 'left-item' : 'right-item'}`}
           >
-            <div className="card-image">
-              <img src={card.image} alt="Birthday" />
-            </div>
-            <div className="card-content">
-              <div className="confetti">
-                <span>🎊</span>
-                <span>✨</span>
-                <span>🎉</span>
+            <div className="timeline-date">{card.date}</div>
+            <div className="timeline-dot"></div>
+            <div
+              ref={addToRefs}
+              className={`birthday-card card-theme-${card.theme}`}
+            >
+              <div className="card-image">
+                <img src={card.image} alt="Birthday" />
               </div>
-              <h3>Happy Birthday!</h3>
-              <p className="card-message">{card.message}</p>
-              <p className="card-sender">- {card.sender}</p>
-              <button className="share-wish">Share This Wish</button>
+              <div className="card-content">
+                <div className="confetti">
+                  <span>🎊</span>
+                  <span>✨</span>
+                  <span>🎉</span>
+                </div>
+                <h3>Happy Birthday!</h3>
+                <p className="card-message">{card.message}</p>
+                <p className="card-sender">- {card.sender}</p>
+              </div>
             </div>
           </div>
         ))}
