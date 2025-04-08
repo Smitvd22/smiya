@@ -32,6 +32,7 @@ function CallerVideo() {
     initializeStream,
     navigate,
     endCallHandler,
+    setConnectionStatus // Added for connection health monitoring
   } = useVideoCallCommon();
 
   // Set call state to 'calling'
@@ -117,18 +118,41 @@ function CallerVideo() {
           // Create peer connection
           const peer = createPeer(
             true, // Is initiator
-            mediaStream, // May be empty but not undefined
+            mediaStream, 
             signal => {
               if (socketRef.current && socketRef.current.connected && isComponentMounted.current) {
-                console.log(`Emitting call-user to ${recipientId}`);
-                socketRef.current.emit('call-user', {
-                  userId: recipientId,
-                  signalData: signal,
-                  from: currentUser.id,
-                  fromUsername: currentUser.username
-                });
+                // Enhanced version of emitting 'call-user'
+                if (signal.type === 'offer') {
+                  console.log(`Emitting initial call-user offer to ${recipientId}`);
+                  
+                  const sendOffer = (retries = 3) => {
+                    if (!isComponentMounted.current) return;
+                    
+                    socketRef.current.emit('call-user', {
+                      userId: recipientId,
+                      signalData: signal,
+                      from: currentUser.id,
+                      fromUsername: currentUser.username
+                    }, (ack) => {
+                      if (!ack && retries > 0 && isComponentMounted.current) {
+                        console.log(`Offer send retry (${retries} attempts left)`);
+                        setTimeout(() => sendOffer(retries - 1), 1000);
+                      }
+                    });
+                  };
+                  
+                  sendOffer();
+                } else {
+                  // For ICE candidates, use signal-update to avoid creating new calls
+                  console.log(`Emitting signal-update (ICE candidate) to ${recipientId}`);
+                  socketRef.current.emit('signal-update', {
+                    to: recipientId,
+                    signal: signal,
+                    from: currentUser.id
+                  });
+                }
               } else {
-                console.error("Cannot emit call-user: Socket not connected");
+                console.error("Cannot emit signal: Socket not connected");
                 if (isComponentMounted.current) {
                   setCallError("Connection to server lost");
                 }
@@ -164,6 +188,24 @@ function CallerVideo() {
               }
             }
           );
+
+          // Add this at the end of the createPeer setup
+          // Send track status information when connected
+          peer.on('connect', () => {
+            try {
+              if (mediaStream && mediaStream.getVideoTracks().length > 0) {
+                const videoEnabled = mediaStream.getVideoTracks()[0].enabled;
+                peer.send(JSON.stringify({
+                  type: 'track-status',
+                  videoEnabled,
+                  audioEnabled: isAudioEnabled
+                }));
+                console.log(`Sent track status: video=${videoEnabled}, audio=${isAudioEnabled}`);
+              }
+            } catch (err) {
+              console.error("Error sending track status:", err);
+            }
+          });
           
           connectionRef.current = peer;
           setupConnectionListeners(peer);
@@ -213,8 +255,35 @@ function CallerVideo() {
     setCallError,
     setCallState,
     userVideo,
-    connectionRef // Added the missing dependency
+    connectionRef,
+    isAudioEnabled // Added the missing dependency
   ]);
+
+  // Extend call timeout in useEffect hook
+  useEffect(() => {
+    if (callState === 'calling') {
+      console.log("Setting up call timeout");
+      
+      const callTimeoutId = setTimeout(() => {
+        if (callState === 'calling' && (!connectionRef.current || !connectionRef.current.connected)) {
+          setCallError('Connection taking longer than expected...');
+          
+          // Extend timeout instead of ending immediately
+          
+          const finalTimeoutId = setTimeout(() => {
+            if (callState === 'calling' && (!connectionRef.current || !connectionRef.current.connected)) {
+              console.log("Call connection timed out");
+              endCallHandler();
+            }
+          }, 30000); // Additional 30s (60s total)
+          
+          return () => clearTimeout(finalTimeoutId);
+        }
+      }, 30000); // Initial 30s
+      
+      return () => clearTimeout(callTimeoutId);
+    }
+  }, [callState, connectionRef, endCallHandler, setCallError]); // Added setCallError
 
   // Handle socket events for calls
   useEffect(() => {
@@ -223,20 +292,35 @@ function CallerVideo() {
     const socket = socketRef.current;
     
     const handleCallAccepted = (signal) => {
-      if (!connectionRef.current) {
-        console.log("Connection reference is null, cannot process accepted call");
+      if (!isComponentMounted.current) return;
+      
+      console.log("Call accepted, received signal:", signal?.type || "ICE candidate");
+      
+      if (!signal) {
+        console.error("Received empty signal in call-accepted");
         return;
       }
       
-      if (isComponentMounted.current) {
+      console.log("Connection ref exists:", !!connectionRef.current);
+      
+      if (connectionRef.current) {
         try {
-          console.log("Call accepted, receiving signal:", signal);
-          connectionRef.current.signal(signal);
-          setCallState('active');
+          // Only process answer signals if we're not already in stable state
+          if (signal.type === 'answer' && connectionRef.current._pc && 
+              connectionRef.current._pc.signalingState === 'have-local-offer') {
+            console.log("Processing incoming answer from receiver");
+            connectionRef.current.signal(signal);
+          } 
+          // Always process ICE candidates
+          else if (signal.type === 'candidate') {
+            console.log("Processing incoming ICE candidate from receiver");
+            connectionRef.current.signal(signal);
+          } else {
+            console.log("Ignoring signal due to invalid state:", connectionRef.current._pc?.signalingState);
+          }
         } catch (err) {
-          console.error("Error handling accepted call:", err);
-          setCallError('Connection error');
-          setTimeout(() => endCallHandler(), 2000);
+          console.error("Error processing incoming signal:", err);
+          setCallError(`Connection error: ${err.message}`);
         }
       }
     };
@@ -265,13 +349,45 @@ function CallerVideo() {
       socket.off('call-ended', handleCallEnded);
     };
   }, [
+    recipientId,
+    callState,
+    streamInitialized,
     endCallHandler,
+    setupConnectionListeners,
+    initializeStream,
+    isComponentMounted,
+    socketRef,
     setCallError,
     setCallState,
-    socketRef,
+    userVideo,
     connectionRef,
-    isComponentMounted
+    isAudioEnabled // Add this missing dependency
   ]);
+
+  // Monitor connection health
+  useEffect(() => {
+    if (!connectionRef.current || callState !== 'active') return;
+    
+    // Create a ping interval to check connection health
+    const healthCheckInterval = setInterval(() => {
+      if (connectionRef.current && typeof connectionRef.current.emit === 'function') {
+        try {
+          // Try to send a small ping data message
+          const startTime = Date.now();
+          connectionRef.current.send(JSON.stringify({type: 'ping', time: startTime}));
+        } catch (err) {
+          console.warn('Connection health check failed:', err);
+          
+          // If we detect connection issues, try reconnecting or end call
+          if (isComponentMounted.current && callState === 'active') {
+            setConnectionStatus('unstable');
+          }
+        }
+      }
+    }, 10000); // Check every 10 seconds
+    
+    return () => clearInterval(healthCheckInterval);
+  }, [connectionRef, callState, isComponentMounted, setConnectionStatus]); // Fixed dependency
 
   return (
     <VideoCallInterface

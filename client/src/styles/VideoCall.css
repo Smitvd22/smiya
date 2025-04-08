@@ -4,7 +4,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.9);
+  background-color: #1a1a1a;
   z-index: 1000;
   display: none;
   flex-direction: column;
@@ -18,58 +18,66 @@
 
 .videos-container {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
   width: 100%;
-  height: 80%;
-  gap: 20px;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
 }
 
 .video-player {
   position: relative;
   width: 100%;
   height: 100%;
-  background: #000;
-  border-radius: 8px;
+  background: #1a1a1a;
   overflow: hidden;
 }
 
 .video-label {
   position: absolute;
-  bottom: 10px;
-  left: 10px;
-  background-color: rgba(0,0,0,0.5);
+  bottom: 24px;
+  left: 24px;
   color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 14px;
+  padding: 0;
+  font-size: 16px;
+  font-weight: bold;
+  z-index: 5;
+}
+
+.my-video-container {
+  position: absolute;
+  bottom: 120px;
+  right: 24px;
+  width: 180px;
+  height: 120px;
+  z-index: 10;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .my-video {
-  width: 30%;
-  height: 30%;
-  position: absolute;
-  bottom: 100px;
-  right: 20px;
-  z-index: 2;
-  border: 2px solid #fff;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .user-video {
   width: 100%;
-  max-width: 800px;
   height: 100%;
-  max-height: 600px;
+  object-fit: cover;
+  background-color: #1a1a1a;
 }
 
 .call-controls {
   position: absolute;
-  bottom: 30px;
+  bottom: 40px;
+  left: 0;
   display: flex;
   justify-content: center;
-  gap: 20px;
+  gap: 16px;
   width: 100%;
+  z-index: 5;
 }
 
 .end-call {
@@ -89,7 +97,6 @@
 
 .end-call:hover {
   background-color: #d32f2f;
-  transform: scale(1.1);
 }
 
 .incoming-call-notification {
@@ -155,17 +162,16 @@ video {
   height: 100%;
   width: 100%;
   font-size: 16px;
-  border-radius: 8px;
 }
 
 .toggle-audio, .toggle-video {
-  background-color: #2196F3;
+  background-color: rgba(255, 255, 255, 0.2);
   color: white;
   border: none;
   border-radius: 50%;
-  width: 60px;
-  height: 60px;
-  font-size: 12px;
+  width: 56px;
+  height: 56px;
+  font-size: 14px;
   cursor: pointer;
   transition: all 0.3s;
   display: flex;
@@ -174,23 +180,22 @@ video {
 }
 
 .toggle-audio:hover, .toggle-video:hover {
-  background-color: #0b7dda;
-  transform: scale(1.1);
+  background-color: rgba(255, 255, 255, 0.3);
 }
 
 .toggle-audio.disabled, .toggle-video.disabled {
-  background-color: #f44336;
+  background-color: rgba(244, 67, 54, 0.7);
 }
 
 .toggle-audio.disabled:hover, .toggle-video.disabled:hover {
-  background-color: #d32f2f;
+  background-color: rgba(211, 47, 47, 0.8);
 }
-
-/* Add these styles for connection indicators */
 
 .connection-indicator {
   position: absolute;
-  top: 60px;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   background-color: rgba(0,0,0,0.7);
   color: white;
   padding: 8px 16px;
@@ -208,21 +213,212 @@ video {
   background-color: rgba(244, 67, 54, 0.8);
 }
 
+/* Connection quality styles */
+.connection-quality {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  z-index: 5;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+}
+
+.quality-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.connection-quality.good .quality-indicator {
+  background-color: #4CAF50;
+}
+
+.connection-quality.fair .quality-indicator {
+  background-color: #FFC107;
+}
+
+.connection-quality.poor .quality-indicator {
+  background-color: #F44336;
+}
+
+/* User profile styles */
+.user-profile {
+  position: absolute;
+  top: 48%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 5;
+}
+
+.profile-image {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 16px;
+}
+
+.profile-name {
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+/* Call status area */
+.call-status {
+  position: absolute;
+  bottom: 120px;
+  width: 100%;
+  text-align: center;
+  color: white;
+  z-index: 5;
+}
+
+.call-status h3 {
+  margin: 0 0 8px 0;
+}
+
+.call-status p {
+  margin: 0;
+  opacity: 0.8;
+}
+
+/* Control button styles to match the reference */
+.control-buttons {
+  position: absolute;
+  bottom: 40px;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.control-button {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  margin: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.mute-button {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.video-button {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.end-call-button {
+  background-color: #f44336;
+}
+
 /* Media queries for responsive design */
 @media (max-width: 768px) {
-  .videos-container {
-    flex-direction: column;
+  .my-video-container {
+    bottom: 100px;
+    right: 16px;
+    width: 120px;
+    height: 80px;
   }
   
-  .my-video {
+  .user-profile .profile-image {
+    width: 120px;
+    height: 120px;
+  }
+  
+  .call-controls {
+    bottom: 24px;
+  }
+  
+  .toggle-audio, .toggle-video, .end-call {
+    width: 48px;
+    height: 48px;
+    font-size: 12px;
+  }
+  
+  .video-label {
+    bottom: 16px;
+    left: 16px;
+    font-size: 14px;
+  }
+}
+
+/* Small mobile devices */
+@media (max-width: 480px) {
+  .my-video-container {
+    bottom: 90px;
+    right: 8px;
     width: 100px;
-    height: 150px;
-    bottom: 80px;
-    right: 10px;
+    height: 70px;
   }
   
-  .user-video {
-    width: 100%;
-    height: auto;
+  .call-controls {
+    gap: 12px;
+    bottom: 16px;
+  }
+  
+  .toggle-audio, .toggle-video, .end-call {
+    width: 42px;
+    height: 42px;
+    font-size: 11px;
+  }
+  
+  .user-profile .profile-image {
+    width: 100px;
+    height: 100px;
+  }
+  
+  .profile-name {
+    font-size: 16px;
+  }
+  
+  .call-status {
+    bottom: 90px;
+  }
+  
+  .call-status h3 {
+    font-size: 16px;
+  }
+  
+  .call-status p {
+    font-size: 14px;
+  }
+}
+
+/* Landscape orientation on mobile */
+@media (max-height: 500px) {
+  .my-video-container {
+    bottom: 80px;
+    right: 16px;
+    width: 100px;
+    height: 70px;
+  }
+  
+  .user-profile .profile-image {
+    width: 80px;
+    height: 80px;
+    margin-bottom: 8px;
+  }
+  
+  .call-controls {
+    bottom: 16px;
+  }
+  
+  .call-status {
+    bottom: 80px;
   }
 }

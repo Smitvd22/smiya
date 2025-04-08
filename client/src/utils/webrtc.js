@@ -15,24 +15,29 @@ export const getUserMedia = async (constraints = { video: true, audio: true }) =
   } catch (error) {
     console.error('Error getting user media:', error);
     
-    // For NotReadableError (device in use), try audio-only if video was requested
-    if (error.name === 'NotReadableError' && constraints.video) {
-      console.log('Attempting audio-only fallback');
+    // For NotReadableError (device in use), try explicit device release and retry
+    if (error.name === 'NotReadableError') {
+      console.log('Forcing device release and retrying...');
+      // Remove reference to undefined stream
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for device release
+      
       try {
-        return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      } catch (audioError) {
-        console.error('Audio fallback failed:', audioError);
+        // Try again with same constraints after device release
+        return await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (retryError) {
+        // If retry fails, handle appropriately
+        console.error('Retry failed:', retryError);
+        throw retryError;
       }
     }
     
-    // Rethrow for caller to handle
-    throw error;
+    throw error; // Re-throw the original error
   }
 };
 
 /**
  * Creates a WebRTC peer connection
- * @param {boolean} initiator - Whether this peer is the initiator
+ * @param {boolean} isInitiator - Whether this peer is the initiator
  * @param {MediaStream} stream - The local media stream (can be null)
  * @param {Function} onSignal - Callback for when signal is generated
  * @param {Function} onConnect - Callback for when connection is established
@@ -41,59 +46,89 @@ export const getUserMedia = async (constraints = { video: true, audio: true }) =
  * @param {Function} onError - Callback for errors
  * @returns {Object} Peer connection object
  */
-export const createPeer = (initiator, stream, onSignal, onConnect, onStream, onClose, onError) => {
-  console.log(`Creating ${initiator ? 'initiator' : 'receiver'} peer with stream`);
+export function createPeer(isInitiator, stream, onSignal, onConnect, onStream, onClose, onError) {
+  console.log(`Creating ${isInitiator ? 'initiator' : 'receiver'} peer with stream:`, 
+              stream ? `Active (Audio tracks: ${stream.getAudioTracks().length}, Video tracks: ${stream.getVideoTracks().length})` : 'No stream');
   
-  try {
-    // Always ensure we have a valid stream object, even if empty
-    const safeStream = stream || new MediaStream();
+  // Use consistent configuration
+  const config = {
+    initiator: isInitiator,
+    trickle: true,
+    stream: stream || undefined,
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:global.stun.twilio.com:3478' }
+      ]
+    }
+  };
+  
+  const peer = new SimplePeer(config);
+  
+  // Listen for signals from the peer connection
+  peer.on('signal', data => {
+    console.log(`Signal generated for ${isInitiator ? 'initiator' : 'receiver'}:`, data.type || 'candidate');
+    if (typeof onSignal === 'function') {
+      onSignal(data);
+    }
+  });
+  
+  // Listen for connection establishment
+  peer.on('connect', () => {
+    console.log(`WebRTC peer connection ESTABLISHED for ${isInitiator ? 'initiator' : 'receiver'}`);
+    if (typeof onConnect === 'function') {
+      onConnect();
+    }
+  });
+  
+  // Listen for incoming stream
+  peer.on('stream', remoteStream => {
+    console.log(`STREAM RECEIVED from ${isInitiator ? 'receiver' : 'initiator'}:`, 
+                `Audio tracks: ${remoteStream.getAudioTracks().length}`,
+                `Video tracks: ${remoteStream.getVideoTracks().length}`);
     
-    const config = {
-      initiator,
-      trickle: true,
-      stream: safeStream,
-      config: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:global.stun.twilio.com:3478' }
-        ]
-      }
-    };
-    
-    const peer = new SimplePeer(config);
-    
-    peer.on('signal', data => {
-      console.log(`Signal generated for ${initiator ? 'initiator' : 'receiver'}:`, data);
-      if (typeof onSignal === 'function') {
-        onSignal(data);
-      }
+    remoteStream.getTracks().forEach(track => {
+      console.log(`Remote track: ${track.kind}, enabled: ${track.enabled}, readyState: ${track.readyState}`);
     });
     
-    if (typeof onConnect === 'function') {
-      peer.on('connect', onConnect);
-    }
-    
     if (typeof onStream === 'function') {
-      peer.on('stream', onStream);
+      onStream(remoteStream);
     }
+  });
+  
+  peer.on('error', err => {
+    console.error(`Peer ${isInitiator ? 'initiator' : 'receiver'} error:`, err);
     
+    // Filter out non-critical errors
+    if (err.message && (
+        err.message.includes('reading') || 
+        err.message.includes('Cannot read properties of undefined'))) {
+      console.warn('Non-critical error, continuing:', err.message);
+    } else if (typeof onError === 'function') {
+      onError(err);
+    }
+  });
+  
+  peer.on('close', () => {
+    console.log(`Peer ${isInitiator ? 'initiator' : 'receiver'} connection closed`);
     if (typeof onClose === 'function') {
-      peer.on('close', onClose);
+      onClose();
     }
+  });
+  
+  // Monitor connection state for debugging
+  if (peer._pc) {
+    peer._pc.addEventListener('connectionstatechange', () => {
+      console.log(`RTCPeerConnection state: ${peer._pc.connectionState}`);
+    });
     
-    if (typeof onError === 'function') {
-      peer.on('error', onError);
-    }
-    
-    return peer;
-  } catch (error) {
-    console.error('Error creating peer:', error);
-    if (typeof onError === 'function') {
-      onError(error);
-    }
-    return null;
+    peer._pc.addEventListener('iceconnectionstatechange', () => {
+      console.log(`ICE connection state: ${peer._pc.iceConnectionState}`);
+    });
   }
-};
+  
+  return peer;
+}
 
 /**
  * Safely clean up media stream

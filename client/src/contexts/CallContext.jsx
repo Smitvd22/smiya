@@ -9,6 +9,8 @@ const CallContext = createContext();
 export function CallProvider({ children }) {
   const [incomingCall, setIncomingCall] = useState(null);
   const [socket, setSocket] = useState(null);
+  const [callerInfo, setCallerInfo] = useState(null);
+  const [callState, setCallState] = useState('idle');
   const socketRef = useRef(null);
   const navigate = useNavigate();
 
@@ -63,15 +65,24 @@ export function CallProvider({ children }) {
     console.log('CallContext: Accepting call', callData);
     setIncomingCall(null);
 
-    // Navigate to video call page with caller info and autoAccept flag
+    // Ensure we have a complete caller info object with proper signals
+    const completeCallerInfo = {
+      signal: callData.signal,
+      id: callData.from,
+      username: callData.fromUsername,
+      fromUsername: callData.fromUsername,
+      profileImage: callData.profileImage || null,
+      autoAccept: true,
+      signalType: callData.signalType || 'offer'
+    };
+    
+    // Store caller info in context for components that mount later
+    setCallerInfo(completeCallerInfo);
+    
+    // Navigate to video call with same info
     navigate('/videocall', {
       state: {
-        callerInfo: {
-          signal: callData.signal,
-          id: callData.from,
-          username: callData.fromUsername,
-          autoAccept: true, // Add this flag
-        },
+        callerInfo: completeCallerInfo,
       },
       replace: true,
     });
@@ -91,6 +102,10 @@ export function CallProvider({ children }) {
     <CallContext.Provider
       value={{
         socket,
+        callerInfo,
+        setCallerInfo,
+        callState,
+        setCallState,
         joinChatRoom: (roomId) => {
           if (socket && socket.connected) socket.emit('join-room', roomId);
         },

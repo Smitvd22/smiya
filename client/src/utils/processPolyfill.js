@@ -11,32 +11,48 @@ if (typeof window !== 'undefined' && !window.process) {
   };
 }
 
-// Fix for process polyfill issues with simple-peer
-// This helps avoid stream related errors
+// More robust handling for stream-related functions
+const originalUpdateReadableListening = window.updateReadableListening;
+window.updateReadableListening = function(stream) {
+  try {
+    if (!stream || !stream._readableState) return;
+    if (typeof originalUpdateReadableListening === 'function') {
+      originalUpdateReadableListening(stream);
+    }
+  } catch (err) {
+    console.warn('Suppressed stream error:', err.message);
+  }
+};
 
-// Make sure we have a process.nextTick function
-if (!window.process) {
-  window.process = {};
-}
+const originalEmitReadable = window.emitReadable_;
+window.emitReadable_ = function(stream) {
+  try {
+    if (!stream || !stream._readableState) return;
+    if (typeof originalEmitReadable === 'function') {
+      originalEmitReadable(stream);
+    }
+  } catch (err) {
+    console.warn('Suppressed stream error:', err.message);
+  }
+};
 
-// Safe nextTick implementation
-if (!window.process.nextTick) {
-  window.process.nextTick = function(callback) {
-    setTimeout(callback, 0);
-  };
-}
-
-// Handle _stream_readable.js error
-// This fixes the "Cannot read properties of undefined (reading '_readableState')" error
+// Safe setTimeout implementation
 const originalSetTimeout = window.setTimeout;
 window.setTimeout = function(callback, delay) {
   if (typeof callback === 'function') {
-    try {
-      return originalSetTimeout(callback, delay);
-    } catch(e) {
-      console.warn('setTimeout error suppressed:', e);
-      return originalSetTimeout(() => {}, delay);
-    }
+    const wrappedCallback = function() {
+      try {
+        callback();
+      } catch (e) {
+        // Check if this is the stream error we're looking for
+        if (e && e.message && e.message.includes('_readableState')) {
+          console.warn('Suppressed stream error in setTimeout');
+          return;
+        }
+        throw e;
+      }
+    };
+    return originalSetTimeout(wrappedCallback, delay);
   }
   return originalSetTimeout(callback, delay);
 };

@@ -369,6 +369,9 @@ function Chat() {
   const initiateCall = () => {
     console.log('Initiating call to friend ID:', friendId);
     
+    // Store current path to return to after call
+    sessionStorage.setItem('preCallPath', window.location.pathname);
+    
     // Navigate to video call page with recipient info
     navigate('/videocall', { state: { recipientId: friendId } });
   };
