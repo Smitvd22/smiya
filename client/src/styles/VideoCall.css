@@ -186,6 +186,28 @@ video {
   background-color: #d32f2f;
 }
 
+/* Add these styles for connection indicators */
+
+.connection-indicator {
+  position: absolute;
+  top: 60px;
+  background-color: rgba(0,0,0,0.7);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  z-index: 4;
+  font-size: 14px;
+  text-align: center;
+}
+
+.connection-indicator.connected {
+  background-color: rgba(76, 175, 80, 0.8);
+}
+
+.connection-indicator.error {
+  background-color: rgba(244, 67, 54, 0.8);
+}
+
 /* Media queries for responsive design */
 @media (max-width: 768px) {
   .videos-container {

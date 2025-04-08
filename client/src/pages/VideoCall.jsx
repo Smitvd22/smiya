@@ -8,17 +8,17 @@ function VideoCall() {
   const location = useLocation();
   const { recipientId, callerInfo } = location.state || {};
   
-  // If we have recipientId, we're the caller
-  // If we have callerInfo, we're the receiver
+  // Determine call role based on provided state
   const isCaller = !!recipientId;
   const isReceiver = !!callerInfo;
 
+  // Render appropriate component based on role
   if (isCaller) {
     return <CallerVideo />;
   } else if (isReceiver) {
     return <ReceiverVideo />;
   } else {
-    // No valid context, render a placeholder that will redirect
+    // Fallback for invalid context - will auto-redirect in useEffect
     return <div className="video-call-container">Redirecting...</div>;
   }
 }

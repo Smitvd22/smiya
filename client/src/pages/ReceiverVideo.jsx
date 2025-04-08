@@ -1,5 +1,5 @@
 // ReceiverVideo.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { createPeer } from '../utils/webrtc';
 import { useVideoCallCommon } from './VideoCallCommon';
@@ -12,14 +12,12 @@ function ReceiverVideo() {
   
   const {
     stream,
-    // setStream,
     callState,
     setCallState,
     callError,
     setCallError,
     isAudioEnabled,
     isVideoEnabled,
-    // streamInitialized,
     myVideo,
     userVideo,
     connectionRef,
@@ -33,10 +31,10 @@ function ReceiverVideo() {
     endCallHandler
   } = useVideoCallCommon();
 
-  // Handle answering an incoming call
-  const answerCall = async () => {
+  // Handle answering an incoming call - wrapped in useCallback
+  const answerCall = useCallback(async () => {
     try {
-      // Set call as active immediately to update UI
+      // Set call as active immediately
       setCallState('active');
       
       // Try to get stream but continue if not possible
@@ -48,12 +46,13 @@ function ReceiverVideo() {
           mediaStream = await initializeStream();
         } catch (err) {
           console.error("Error initializing stream:", err);
-          // Continue without media
-          setCallError("Joining without camera access");
+          // Continue with empty stream
+          mediaStream = new MediaStream();
+          setCallError("Joining without camera/mic access");
         }
       }
       
-      // Only proceed if we still have a valid context
+      // Verify we have valid caller info
       if (!isComponentMounted.current || !callerInfo || !callerInfo.signal) {
         setCallError("Missing caller information");
         setTimeout(() => {
@@ -67,7 +66,7 @@ function ReceiverVideo() {
       console.log("Creating receiver peer");
       const peer = createPeer(
         false, // Not the initiator
-        mediaStream, // Could be null
+        mediaStream, // Could be null or empty
         signal => {
           if (socketRef.current && callerInfo && isComponentMounted.current) {
             console.log("Answering call with signal:", signal);
@@ -107,14 +106,11 @@ function ReceiverVideo() {
         }
       );
       
-      // Log the signal we're processing
-      console.log("Processing incoming signal:", callerInfo.signal);
-      
-      // Store the peer in ref and add listeners
+      // Store peer and add listeners
       connectionRef.current = peer;
       setupConnectionListeners(peer);
       
-      // Process the signal
+      // Process the incoming signal
       peer.signal(callerInfo.signal);
       
     } catch (error) {
@@ -126,7 +122,19 @@ function ReceiverVideo() {
         }
       }, 3000);
     }
-  };
+  }, [
+    stream,
+    initializeStream,
+    isComponentMounted,
+    callerInfo,
+    setCallError,
+    endCallHandler,
+    socketRef,
+    setCallState,
+    setupConnectionListeners,
+    connectionRef, // Add this missing dependency
+    userVideo    // Add this missing dependency
+  ]);
   
   // Handle rejecting an incoming call
   const rejectCall = () => {
@@ -144,14 +152,29 @@ function ReceiverVideo() {
   useEffect(() => {
     if (locationCallerInfo) {
       setCallState('receiving');
-      // Try to initialize stream but don't block on it
+      // Try to initialize stream but don't block
       initializeStream().catch(err => {
         console.error("Failed to initialize stream:", err);
       });
     }
   }, [locationCallerInfo, setCallState, initializeStream]);
 
-  // Safe redirect if no valid call context
+  // Auto-accept call if coming from notification
+  useEffect(() => {
+    if (locationCallerInfo && locationCallerInfo.autoAccept && callState === 'receiving') {
+      // Small delay to ensure everything is properly initialized
+      const timer = setTimeout(() => {
+        if (isComponentMounted.current) {
+          console.log('Auto-accepting call from notification');
+          answerCall();
+        }
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [locationCallerInfo, callState, answerCall, isComponentMounted]);
+
+  // Redirect if no valid call context
   useEffect(() => {
     if (!callerInfo && callState === 'idle') {
       console.log('No valid call context, redirecting back');
@@ -165,32 +188,54 @@ function ReceiverVideo() {
     }
   }, [callerInfo, callState, navigate, isComponentMounted]);
 
-  // Handle socket events for incoming calls
+  // Handle socket events
   useEffect(() => {
     if (!socketRef.current) {
       console.error("No socket available for event registration");
       return;
     }
 
-    // Store reference to socket to use in cleanup
     const socket = socketRef.current;
     
     const handleIncomingCall = ({ signal, from, fromUsername }) => {
       console.log(`Incoming call from ${fromUsername} (${from})`, signal);
       if (isComponentMounted.current) {
-        setCallState('receiving');
+        // Store caller info but set call state directly to 'active' instead of 'receiving'
         setCallerInfo({ signal, id: from, username: fromUsername });
+        setCallState('active');
+        
+        // Auto-accept the call with a small delay
+        setTimeout(() => {
+          if (isComponentMounted.current) {
+            console.log('Auto-accepting incoming call');
+            answerCall();
+          }
+        }, 300);
       }
     };
     
     const handleCallEnded = () => {
-      if (isComponentMounted.current && callState !== 'idle') {
+      if (isComponentMounted.current) {
+        console.log("Call ended by other user");
         setCallError('Call ended by other user');
+        
+        // Set call state to idle FIRST
+        setCallState('idle');
+        
+        // Use a single timeout for all cleanup
         setTimeout(() => {
           if (isComponentMounted.current) {
+            // Let endCallHandler do the proper cleanup sequence
             endCallHandler();
+            
+            // Add a fallback navigation with longer delay
+            setTimeout(() => {
+              if (isComponentMounted.current && document.visibilityState !== 'hidden') {
+                navigate(-1);
+              }
+            }, 1000);
           }
-        }, 1500);
+        }, 300);
       }
     };
 
@@ -201,7 +246,49 @@ function ReceiverVideo() {
       socket.off('incoming-call', handleIncomingCall);
       socket.off('call-ended', handleCallEnded);
     };
-  }, [callState, isComponentMounted, endCallHandler, setCallError, setCallState, socketRef]);
+  }, [callState, isComponentMounted, endCallHandler, setCallError, setCallState, socketRef, answerCall ,connectionRef , navigate]);
+
+  // Health check interval for socket connection
+  useEffect(() => {
+    if (!socketRef.current || !socketRef.current.connected) return;
+    
+    const healthCheckInterval = setInterval(() => {
+      if (socketRef.current.connected) {
+        const startTime = Date.now();
+        socketRef.current.volatile.emit('ping', () => {
+          const latency = Date.now() - startTime;
+          console.log(`Socket connection healthy, latency: ${latency}ms`);
+        });
+      }
+    }, 10000);
+    
+    return () => clearInterval(healthCheckInterval);
+  }, [socketRef]);
+
+  // Override endCallHandler to ensure it has the caller ID
+  const wrappedEndCallHandler = useCallback(() => {
+    // Send end-call signal if needed
+    if (socketRef.current?.connected && callerInfo?.id) {
+      try {
+        socketRef.current.emit('end-call', { to: callerInfo.id });
+      } catch (err) {
+        console.error("Error sending end-call:", err);
+      }
+    }
+    
+    // Set state to idle FIRST before any cleanup
+    setCallState('idle');
+    
+    // Use original handler for cleanup
+    endCallHandler();
+    
+    // Add navigation with delay to ensure cleanup completes
+    setTimeout(() => {
+      if (isComponentMounted.current) {
+        navigate(-1);
+      }
+    }, 800);
+  }, [endCallHandler, socketRef, callerInfo, setCallState, navigate, isComponentMounted]);
 
   return (
     <VideoCallInterface
@@ -212,7 +299,7 @@ function ReceiverVideo() {
       isVideoEnabled={isVideoEnabled}
       toggleAudio={toggleAudio}
       toggleVideo={toggleVideo}
-      endCallHandler={endCallHandler}
+      endCallHandler={wrappedEndCallHandler} // Use our wrapped handler
       callError={callError}
       callState={callState}
       callerInfo={callerInfo}

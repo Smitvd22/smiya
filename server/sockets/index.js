@@ -90,6 +90,14 @@ export const setupSocketIO = (io) => {
     socket.on('disconnect', () => {
       console.log('User disconnected:', socket.id);
     });
+
+    // ====== PING FUNCTIONALITY ======
+
+    socket.on('ping', (callback) => {
+      if (typeof callback === 'function') {
+        callback();
+      }
+    });
   });
 };
 

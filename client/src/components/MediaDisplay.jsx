@@ -7,9 +7,8 @@ const MediaDisplay = ({ media }) => {
   const [isVisible, setIsVisible] = useState(false);
   const containerRef = useRef(null);
 
-  // More detailed logging when component mounts
+  // Effect when media changes
   useEffect(() => {
-    console.log("MediaDisplay received media:", media);
     if (!media || !media.url) {
       console.error("Media data missing required URL property:", media);
       setLoadError(true);

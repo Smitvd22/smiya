@@ -1,81 +1,103 @@
 import SimplePeer from 'simple-peer';
 
 /**
- * Create a WebRTC peer connection
- */
-export const createPeer = (initiator, stream, onSignal, onConnect, onStream, onClose, onError) => {
-  try {
-    console.log(`Creating ${initiator ? 'initiator' : 'receiver'} peer ${stream ? 'with stream' : 'without stream'}`);
-    
-    const peerOptions = {
-      initiator,
-      trickle: true,
-      config: { 
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun3.l.google.com:19302' },
-          { urls: 'stun:stun4.l.google.com:19302' },
-          { urls: 'stun:global.stun.twilio.com:3478' }
-        ] 
-      }
-    };
-
-    // Only add stream if it's valid and has tracks
-    if (stream && stream instanceof MediaStream && stream.getTracks && stream.getTracks().length > 0) {
-      peerOptions.stream = stream;
-    }
-
-    const peer = new SimplePeer(peerOptions);
-
-    // Safely add event handlers with error catching
-    if (onSignal) peer.on('signal', data => {
-      try { onSignal(data); } catch (e) { console.error("Signal handler error:", e); }
-    });
-    
-    if (onConnect) peer.on('connect', () => {
-      try { onConnect(); } catch (e) { console.error("Connect handler error:", e); }
-    });
-    
-    if (onStream) peer.on('stream', remoteStream => {
-      try { onStream(remoteStream); } catch (e) { console.error("Stream handler error:", e); }
-    });
-    
-    if (onClose) peer.on('close', () => {
-      try { onClose(); } catch (e) { console.error("Close handler error:", e); }
-    });
-    
-    if (onError) peer.on('error', err => {
-      try { onError(err); } catch (e) { console.error("Error handler handler error:", e); }
-    });
-
-    return peer;
-  } catch (error) {
-    console.error('Error creating peer:', error);
-    if (onError) onError(error);
-    throw error;
-  }
-};
-
-/**
- * Helper function to get user media
+ * Get user media with specified constraints
+ * @param {Object} constraints - Media constraints
+ * @returns {Promise<MediaStream>} Media stream
  */
 export const getUserMedia = async (constraints = { video: true, audio: true }) => {
+  console.log('Requesting user media with constraints:', constraints);
+  
   try {
-    console.log('Requesting user media with constraints:', constraints);
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     console.log('User media acquired successfully');
     return stream;
   } catch (error) {
     console.error('Error getting user media:', error);
-    // Return empty stream instead of null to avoid errors
-    return new MediaStream();
+    
+    // For NotReadableError (device in use), try audio-only if video was requested
+    if (error.name === 'NotReadableError' && constraints.video) {
+      console.log('Attempting audio-only fallback');
+      try {
+        return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      } catch (audioError) {
+        console.error('Audio fallback failed:', audioError);
+      }
+    }
+    
+    // Rethrow for caller to handle
+    throw error;
+  }
+};
+
+/**
+ * Creates a WebRTC peer connection
+ * @param {boolean} initiator - Whether this peer is the initiator
+ * @param {MediaStream} stream - The local media stream (can be null)
+ * @param {Function} onSignal - Callback for when signal is generated
+ * @param {Function} onConnect - Callback for when connection is established
+ * @param {Function} onStream - Callback for when remote stream is received
+ * @param {Function} onClose - Callback for when connection is closed
+ * @param {Function} onError - Callback for errors
+ * @returns {Object} Peer connection object
+ */
+export const createPeer = (initiator, stream, onSignal, onConnect, onStream, onClose, onError) => {
+  console.log(`Creating ${initiator ? 'initiator' : 'receiver'} peer with stream`);
+  
+  try {
+    // Always ensure we have a valid stream object, even if empty
+    const safeStream = stream || new MediaStream();
+    
+    const config = {
+      initiator,
+      trickle: true,
+      stream: safeStream,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478' }
+        ]
+      }
+    };
+    
+    const peer = new SimplePeer(config);
+    
+    peer.on('signal', data => {
+      console.log(`Signal generated for ${initiator ? 'initiator' : 'receiver'}:`, data);
+      if (typeof onSignal === 'function') {
+        onSignal(data);
+      }
+    });
+    
+    if (typeof onConnect === 'function') {
+      peer.on('connect', onConnect);
+    }
+    
+    if (typeof onStream === 'function') {
+      peer.on('stream', onStream);
+    }
+    
+    if (typeof onClose === 'function') {
+      peer.on('close', onClose);
+    }
+    
+    if (typeof onError === 'function') {
+      peer.on('error', onError);
+    }
+    
+    return peer;
+  } catch (error) {
+    console.error('Error creating peer:', error);
+    if (typeof onError === 'function') {
+      onError(error);
+    }
+    return null;
   }
 };
 
 /**
  * Safely clean up media stream
+ * @param {MediaStream} stream - Media stream to stop
  */
 export const stopMediaStream = (stream) => {
   if (!stream) return;

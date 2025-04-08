@@ -1,8 +1,7 @@
 // VideoCallCommon.jsx
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-// import { getUserMedia, stopMediaStream } from '../utils/webrtc';
-import { getUserMedia} from '../utils/webrtc';
+import { getUserMedia } from '../utils/webrtc';
 import { getCurrentUser } from '../services/authService';
 import { useCall } from '../contexts/CallContext';
 import '../styles/VideoCall.css';
@@ -12,6 +11,7 @@ export const useVideoCallCommon = () => {
   const location = useLocation();
   const { socket } = useCall();
   
+  // Stream and call state
   const [stream, setStream] = useState(null);
   const [callState, setCallState] = useState('idle');
   const [callError, setCallError] = useState('');
@@ -21,20 +21,20 @@ export const useVideoCallCommon = () => {
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [streamInitialized, setStreamInitialized] = useState(false);
   
+  // Refs
   const myVideo = useRef(null);
   const userVideo = useRef(null);
   const connectionRef = useRef(null);
   const socketRef = useRef(socket);
   const isComponentMounted = useRef(true);
   const streamInitPromise = useRef(null);
+  const reconnectionAttempts = useRef(0);
+  const endCallHandlerRef = useRef(null);
 
   // Track component mount status
   useEffect(() => {
     isComponentMounted.current = true;
-    
-    return () => {
-      isComponentMounted.current = false;
-    };
+    return () => { isComponentMounted.current = false; };
   }, []);
 
   // Update socket reference when it changes
@@ -42,55 +42,60 @@ export const useVideoCallCommon = () => {
     socketRef.current = socket;
   }, [socket]);
 
-  // Monitor socket status
+  // Monitor socket connection status
   useEffect(() => {
     if (!socket) {
-      console.error("Socket is not available from context");
       setSocketConnected(false);
       return;
     }
-  
+
     setSocketConnected(socket.connected);
-  
+    let disconnectTimer = null;
+
     const handleConnect = () => {
-      console.log("Socket connected in VideoCall component");
+      console.log("Socket connected in VideoCall");
+      // Clear any pending disconnect timer
+      if (disconnectTimer) clearTimeout(disconnectTimer);
       setSocketConnected(true);
       
-      // Join user room on reconnection
+      // Join personal room for receiving calls
       const currentUser = getCurrentUser();
       if (currentUser) {
         socket.emit('join-user-room', `user-${currentUser.id}`);
-        console.log(`Joined user room: user-${currentUser.id}`);
       }
     };
-  
+
     const handleDisconnect = () => {
-      console.log("Socket disconnected in VideoCall component");
-      setSocketConnected(false);
+      console.log("Socket disconnecting in VideoCall - delaying UI update");
+      // Add a delay before showing disconnection to avoid flickering
+      disconnectTimer = setTimeout(() => {
+        if (!socket.connected) {
+          console.log("Socket confirmed disconnected after delay");
+          setSocketConnected(false);
+        }
+      }, 2000); // 2-second delay before showing disconnect
     };
-  
+
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
-  
-    // Ensure we're properly connected when the component loads
-    if (socket.connected) {
-      handleConnect();
-    }
-  
+    
+    if (socket.connected) handleConnect();
+
     return () => {
+      if (disconnectTimer) clearTimeout(disconnectTimer);
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
     };
   }, [socket]);
 
-  // Set up stream for video when available
+  // Configure stream when available
   useEffect(() => {
     if (stream && myVideo.current) {
       myVideo.current.srcObject = stream;
     }
   }, [stream]);
 
-  // Initialize audio/video state based on initial tracks
+  // Initialize audio/video state
   useEffect(() => {
     if (stream) {
       const audioTrack = stream.getAudioTracks()[0];
@@ -100,7 +105,27 @@ export const useVideoCallCommon = () => {
     }
   }, [stream]);
 
-  // Setup connection listeners
+  // First define the reconnection logic
+  const attemptReconnection = useCallback((peerId) => {
+    if (!socketConnected || reconnectionAttempts.current > 3) {
+      setCallError('Connection lost. Cannot reconnect.');
+      setTimeout(() => {
+        // Use the ref instead of direct function reference
+        if (endCallHandlerRef.current) {
+          endCallHandlerRef.current();
+        }
+      }, 3000);
+      return;
+    }
+    
+    reconnectionAttempts.current += 1;
+    setConnectionStatus('reconnecting');
+    
+    // Re-establish connection logic would go here
+    // ...
+  }, [socketConnected]);
+
+  // Then setup connection listeners with proper dependency
   const setupConnectionListeners = useCallback((peer) => {
     if (!peer) return;
     
@@ -115,6 +140,7 @@ export const useVideoCallCommon = () => {
       console.error("Peer connection error:", err);
       if (isComponentMounted.current) {
         setConnectionStatus('error');
+        attemptReconnection(peer.id);
       }
     });
     
@@ -124,79 +150,54 @@ export const useVideoCallCommon = () => {
         setConnectionStatus('disconnected');
       }
     });
+  }, [attemptReconnection]); // Add attemptReconnection as dependency
 
-    peer.on('data', (data) => {
-      console.log("Received data from peer:", data);
-    });
-  }, []);
-
-  // Cleanup resources function
+  // Cleanup resources
   const cleanupResources = useCallback(() => {
     console.log("Cleaning up resources");
     
-    // First destroy the peer connection
+    // First clean up video elements
+    if (myVideo.current) myVideo.current.srcObject = null;
+    if (userVideo.current) userVideo.current.srcObject = null;
+    
+    // Then destroy peer connection with proper error handling
     if (connectionRef.current) {
       try {
-        const connection = connectionRef.current;
-        
-        // Remove all listeners first to prevent callbacks after destroy
-        try {
-          connection.removeAllListeners();
-        } catch (err) {
-          console.error("Error removing listeners:", err);
+        // Remove all event listeners first
+        if (connectionRef.current.removeAllListeners) {
+          try {
+            connectionRef.current.removeAllListeners();
+          } catch (err) {
+            console.log("Could not remove listeners:", err);
+          }
         }
         
-        // Then destroy the connection
-        try {
-          connection.destroy();
-        } catch (err) {
-          console.error("Error destroying peer:", err);
+        if (typeof connectionRef.current.destroy === 'function') {
+          connectionRef.current.destroy();
         }
-        
-        connectionRef.current = null;
       } catch (err) {
         console.error("Error cleaning up connection:", err);
+      } finally {
+        connectionRef.current = null;
       }
     }
     
-    // Then clean up media
+    // Then handle media streams
     if (stream) {
       try {
-        // Clear video elements first
-        if (myVideo.current) {
-          myVideo.current.srcObject = null;
-        }
-        if (userVideo.current) {
-          userVideo.current.srcObject = null;
-        }
-        
-        // Then stop all tracks
-        if (stream.getTracks) {
-          stream.getTracks().forEach(track => {
-            try {
-              if (track.readyState === 'live') {
-                track.stop();
-              }
-            } catch (err) {
-              console.error("Error stopping track:", err);
-            }
-          });
-        }
-        
-        setStream(null);
-        setStreamInitialized(false);
+        stream.getTracks().forEach(track => {
+          try {
+            if (track.readyState === 'live') track.stop();
+          } catch (e) {}
+        });
       } catch (err) {
-        console.error("Error stopping streams:", err);
+        console.error("Error stopping tracks:", err);
       }
+      setStream(null);
     }
-    
-    // Reset call state
-    setCallState('idle');
-    setCallError('');
-    setConnectionStatus('initializing');
-  }, [stream, myVideo, userVideo]);
+  }, [stream, myVideo, userVideo, setStream]);
 
-  // Controls for audio and video
+  // Media controls
   const toggleAudio = useCallback(() => {
     if (stream) {
       const audioTrack = stream.getAudioTracks()[0];
@@ -209,40 +210,97 @@ export const useVideoCallCommon = () => {
 
   const toggleVideo = useCallback(() => {
     if (stream) {
-      const videoTrack = stream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setIsVideoEnabled(videoTrack.enabled);
+      const videoTracks = stream.getVideoTracks();
+      
+      if (isVideoEnabled) {
+        // Currently enabled, turn off video
+        videoTracks.forEach(track => {
+          if (track.readyState === 'live') {
+            track.stop();
+          }
+        });
+        setIsVideoEnabled(false);
+      } else {
+        // Currently disabled, get a new video stream
+        navigator.mediaDevices.getUserMedia({ video: true })
+          .then(videoStream => {
+            // Keep existing audio track if available
+            const audioTrack = stream.getAudioTracks()[0];
+            
+            // Create a new combined stream
+            const newStream = new MediaStream();
+            
+            // Add the new video track
+            videoStream.getVideoTracks().forEach(track => {
+              newStream.addTrack(track);
+            });
+            
+            // Add the existing audio track if available
+            if (audioTrack) {
+              newStream.addTrack(audioTrack);
+            }
+            
+            // Replace the old stream with the new one
+            setStream(newStream);
+            
+            // Update the video element
+            if (myVideo.current) {
+              myVideo.current.srcObject = newStream;
+            }
+            
+            // Update the peer connection if active
+            if (connectionRef.current) {
+              // Remove old tracks first
+              const senders = connectionRef.current.getSenders();
+              senders.forEach(sender => {
+                if (sender.track && sender.track.kind === 'video') {
+                  connectionRef.current.removeTrack(sender);
+                }
+              });
+              
+              // Add new video track
+              const newVideoTrack = videoStream.getVideoTracks()[0];
+              if (newVideoTrack) {
+                connectionRef.current.addTrack(newVideoTrack, newStream);
+              }
+            }
+            
+            setIsVideoEnabled(true);
+          })
+          .catch(err => {
+            console.error("Error re-acquiring camera:", err);
+            setCallError('Could not access camera');
+            setTimeout(() => setCallError(''), 3000);
+          });
       }
     }
-  }, [stream]);
+  }, [stream, isVideoEnabled, myVideo, connectionRef, setCallError, setStream]);
 
-  // Initialize media stream - singleton pattern to prevent multiple simultaneous calls
+  // Initialize media stream - with optional permissions
   const initializeStream = useCallback(async (audioEnabled = true, videoEnabled = true) => {
-    // If we already have a stream, return it
+    // Return existing stream if available
     if (stream) return stream;
     
-    // If stream initialization is in progress, wait for it
-    if (streamInitPromise.current) {
-      return streamInitPromise.current;
-    }
+    // Wait for any pending initialization
+    if (streamInitPromise.current) return streamInitPromise.current;
     
     console.log('Initializing media stream');
     setStreamInitialized(false);
     
     streamInitPromise.current = new Promise(async (resolve) => {
       try {
-        // Try to get user media with specified constraints
+        // Get user media with requested constraints
         const currentStream = await getUserMedia({
           video: videoEnabled,
           audio: audioEnabled
         });
         
+        // Handle component unmount during async operation
         if (!isComponentMounted.current) {
-          // Component unmounted during async operation
           if (currentStream && currentStream.getTracks) {
             currentStream.getTracks().forEach(track => track.stop());
           }
+          streamInitPromise.current = null;
           resolve(null);
           return;
         }
@@ -250,12 +308,13 @@ export const useVideoCallCommon = () => {
         setStream(currentStream);
         setStreamInitialized(true);
         
+        // Connect stream to video element
         if (myVideo.current) {
           myVideo.current.srcObject = currentStream;
         }
         
-        // Apply initial enabled state to tracks
-        if (currentStream && currentStream.getTracks) {
+        // Apply initial track states
+        if (currentStream) {
           const audioTrack = currentStream.getAudioTracks()[0];
           const videoTrack = currentStream.getVideoTracks()[0];
           
@@ -273,38 +332,53 @@ export const useVideoCallCommon = () => {
         resolve(currentStream);
       } catch (err) {
         console.error("Media error:", err);
-        if (isComponentMounted.current) {
-          setCallError('Camera/microphone access error');
+        
+        // Create empty stream as fallback for any media error
+        console.log("Creating empty stream as fallback");
+        const emptyStream = new MediaStream();
+        setStream(emptyStream);
+        setStreamInitialized(true);
+        
+        // Set appropriate warning message based on error
+        if (err.name === "NotReadableError") {
+          setCallError('Camera/microphone in use - you can still see and hear others');
+        } else if (err.name === "NotAllowedError") {
+          setCallError('Permission denied - you can still see and hear others');
+        } else {
+          setCallError('Media access error - you can still see and hear others');
         }
-        setStreamInitialized(false);
-        resolve(new MediaStream()); // Return empty stream instead of null
+        
+        // Clear the error after a few seconds
+        setTimeout(() => {
+          if (isComponentMounted.current) {
+            setCallError('');
+          }
+        }, 5000);
+        
+        // Still resolve with empty stream to allow call to proceed
+        resolve(emptyStream);
       } finally {
         streamInitPromise.current = null;
       }
     });
     
     return streamInitPromise.current;
-  }, [stream, setCallError, isComponentMounted, myVideo, setIsAudioEnabled, setIsVideoEnabled]);
+  }, [stream, setCallError, isComponentMounted, myVideo, setStream, setStreamInitialized, setIsAudioEnabled, setIsVideoEnabled]);
 
-  // Add this to useVideoCallCommon hook
+  // End call handler
   const endCallHandler = useCallback(() => {
-    if (!isComponentMounted.current) return;
-    
-    // Prevent multiple cleanup triggers
-    if (callState === 'idle') return;
+    if (!isComponentMounted.current || callState === 'idle') return;
     
     console.log("Ending call");
     
-    // Send end-call signal if applicable
+    // Send end-call signal first
     if (socketRef.current && socketRef.current.connected) {
-      // Use the location hook result
       const recipientId = location.state?.recipientId;
       const callerId = location.state?.callerInfo?.id;
       const callRecipient = recipientId || callerId;
       
       if (callRecipient) {
         try {
-          console.log(`Emitting end-call to ${callRecipient}`);
           socketRef.current.emit('end-call', { to: callRecipient });
         } catch (err) {
           console.error("Error emitting end-call:", err);
@@ -312,15 +386,15 @@ export const useVideoCallCommon = () => {
       }
     }
     
-    // Set state to idle to prevent re-renders during cleanup
+    // Set state to idle
     setCallState('idle');
     
-    // Clean up resources with a small delay
+    // Add a small delay before cleaning up resources
     setTimeout(() => {
       if (isComponentMounted.current) {
         cleanupResources();
         
-        // Navigate back after cleanup
+        // Navigate back
         setTimeout(() => {
           if (isComponentMounted.current) {
             navigate(-1);
@@ -329,7 +403,13 @@ export const useVideoCallCommon = () => {
       }
     }, 200);
   }, [cleanupResources, navigate, callState, location.state, socketRef, isComponentMounted]);
+  
+  // Store the handler in our ref after definition
+  useEffect(() => {
+    endCallHandlerRef.current = endCallHandler;
+  }, [endCallHandler]);
 
+  // Return all needed values and functions
   return {
     stream,
     setStream,

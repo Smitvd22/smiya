@@ -118,9 +118,12 @@ export const initializeSocket = (debug = false) => {
   console.log('Creating new socket connection');
   socket = io(process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000', {
     reconnection: true,
-    reconnectionAttempts: 5,
-    transports: ['websocket'],
-    auth: { userId: user.id } // Add authentication data
+    reconnectionAttempts: 10,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    timeout: 20000,
+    transports: ['websocket', 'polling'], // Allow fallback to polling
+    auth: { userId: user.id }
   });
   
   socket.on('connect', () => {

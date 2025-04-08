@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { initializeSocket} from '../services/authService';
+import { initializeSocket } from '../services/authService';
 import { getCurrentUser } from '../services/authService';
 import IncomingCallNotification from '../components/IncomingCallNotification';
 
@@ -12,21 +12,18 @@ export function CallProvider({ children }) {
   const socketRef = useRef(null);
   const navigate = useNavigate();
 
-  // Single socket initialization for the entire app
+  // Initialize socket for the app
   useEffect(() => {
     const user = getCurrentUser();
     if (!user) return;
 
-    // Use the existing singleton socket
+    // Use existing socket
     const socketInstance = initializeSocket();
     if (!socketInstance) return;
 
-    // Store reference and set state
+    // Store socket references
     socketRef.current = socketInstance;
     setSocket(socketInstance);
-
-    // Listen for socket events here
-    // No need to handle connect/disconnect as authService already does this
 
     return () => {
       console.log('Cleaning up call context listeners');
@@ -36,10 +33,7 @@ export function CallProvider({ children }) {
         } catch (err) {
           console.error('Error removing listeners:', err);
         }
-
-        // Don't disconnect here - authService manages the socket lifecycle
         socketRef.current = null;
-        setSocket(null);
       }
     };
   }, []);
@@ -48,7 +42,7 @@ export function CallProvider({ children }) {
   useEffect(() => {
     if (!socket) return;
 
-    // First remove any existing listener to prevent duplicates
+    // Remove existing listeners to prevent duplicates
     socket.off('incoming-call');
     
     const handleIncomingCall = (callData) => {
@@ -69,13 +63,14 @@ export function CallProvider({ children }) {
     console.log('CallContext: Accepting call', callData);
     setIncomingCall(null);
 
-    // Navigate to video call page with caller info
+    // Navigate to video call page with caller info and autoAccept flag
     navigate('/videocall', {
       state: {
         callerInfo: {
           signal: callData.signal,
           id: callData.from,
           username: callData.fromUsername,
+          autoAccept: true, // Add this flag
         },
       },
       replace: true,
@@ -91,13 +86,6 @@ export function CallProvider({ children }) {
     }
     setIncomingCall(null);
   };
-
-  // Debug when incomingCall state changes
-  useEffect(() => {
-    if (incomingCall) {
-      console.log('Incoming call state updated:', incomingCall);
-    }
-  }, [incomingCall]);
 
   return (
     <CallContext.Provider

@@ -369,16 +369,14 @@ function Chat() {
   const initiateCall = () => {
     console.log('Initiating call to friend ID:', friendId);
     
-    // No need to set up a socket connection here as it's already handled by the context
+    // Navigate to video call page with recipient info
     navigate('/videocall', { state: { recipientId: friendId } });
   };
 
   // Modified message rendering to include media display
   const renderMessage = (message) => {
     const isCurrentUser = message.senderId === getCurrentUser()?.id;
-    
-    // Log complete message data for debugging
-    console.log('Full message data:', message);
+  
     
     // Check for missing media properties
     if (message.mediaUrl === undefined && message.hasMedia) {

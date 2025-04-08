@@ -15,18 +15,22 @@ const VideoCallInterface = ({
   callerInfo,
   answerCall,
   rejectCall,
+  connectionStatus,  // New prop
+  socketConnected,   // New prop
 }) => {
   return (
     <div className="video-call-container active">
       {callError && <div className="call-error">{callError}</div>}
 
-      {callState === 'receiving' && (
-        <div className="incoming-call-notification">
-          <h3>Incoming call from {callerInfo?.username || 'Unknown'}</h3>
-          <div className="call-actions">
-            <button className="answer-call" onClick={answerCall}>Accept</button>
-            <button className="reject-call" onClick={rejectCall}>Reject</button>
-          </div>
+      {/* Connection status indicators */}
+      {connectionStatus === 'connected' && <div className="connection-indicator connected">Connected</div>}
+      {connectionStatus === 'error' && <div className="connection-indicator error">Connection error</div>}
+      {connectionStatus === 'initializing' && <div className="connection-indicator initializing">Initializing connection...</div>}
+      {connectionStatus === 'connecting' && <div className="connection-indicator connecting">Connecting...</div>}
+      {connectionStatus === 'reconnecting' && <div className="connection-indicator reconnecting">Attempting to reconnect...</div>}
+      {!socketConnected && callState !== 'idle' && (
+        <div className="connection-indicator error">
+          Socket disconnected - call functionality limited
         </div>
       )}
 
@@ -34,7 +38,7 @@ const VideoCallInterface = ({
         <div className="call-status">
           <h3>Calling...</h3>
           <p>Waiting for answer</p>
-          <button className="end-call" onClick={endCallHandler}>Cancel</button>
+          {/* <button className="end-call" onClick={endCallHandler}>Cancel</button> */}
         </div>
       )}
 
@@ -48,31 +52,40 @@ const VideoCallInterface = ({
           <div className="video-label">You</div>
         </div>
         
-        {callState === 'active' && (
+        {(callState === 'active' || callState === 'calling') && (
           <div className="video-player user-video">
-            <video playsInline ref={userVideo} autoPlay />
+            {callState === 'calling' ? (
+              <div className="video-placeholder">Waiting for user to join...</div>
+            ) : userVideo?.current?.srcObject ? (
+              <video playsInline ref={userVideo} autoPlay />
+            ) : (
+              <div className="video-placeholder">Remote user's camera is off</div>
+            )}
             <div className="video-label">{callerInfo?.username || 'User'}</div>
           </div>
         )}
       </div>
 
-      <div className="call-controls">
-        <button
-          className={`toggle-audio ${!isAudioEnabled ? 'disabled' : ''}`}
-          onClick={toggleAudio}
-        >
-          {isAudioEnabled ? 'Mute' : 'Unmute'}
-        </button>
-        <button
-          className={`toggle-video ${!isVideoEnabled ? 'disabled' : ''}`}
-          onClick={toggleVideo}
-        >
-          {isVideoEnabled ? 'Hide Video' : 'Show Video'}
-        </button>
-        <button className="end-call" onClick={endCallHandler}>
-          End Call
-        </button>
-      </div>
+      {/* Show call controls during both active calls AND while calling */}
+      {(callState === 'active' || callState === 'calling') && (
+        <div className="call-controls">
+          <button
+            className={`toggle-audio ${!isAudioEnabled ? 'disabled' : ''}`}
+            onClick={toggleAudio}
+          >
+            {isAudioEnabled ? 'Mute' : 'Unmute'}
+          </button>
+          <button
+            className={`toggle-video ${!isVideoEnabled ? 'disabled' : ''}`}
+            onClick={toggleVideo}
+          >
+            {isVideoEnabled ? 'Hide Video' : 'Show Video'}
+          </button>
+          <button className="end-call" onClick={endCallHandler}>
+            {callState === 'calling' ? 'Cancel' : 'End Call'}
+          </button>
+        </div>
+      )}
     </div>
   );
 };
