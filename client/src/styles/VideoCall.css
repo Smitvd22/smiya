@@ -10,6 +10,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  --control-size: clamp(42px, 8vw, 56px);
+  --spacing: clamp(8px, 2vw, 16px);
 }
 
 .video-call-container.active {
@@ -47,13 +49,18 @@
   position: absolute;
   bottom: 120px;
   right: 24px;
-  width: 180px;
-  height: 120px;
+  width: clamp(90px, 25vw, 160px);
+  height: clamp(60px, 15vw, 120px);
   z-index: 10;
-  border-radius: 8px;
+  border-radius: clamp(6px, 1.5vw, 12px);
   overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: transform 0.3s ease, width 0.3s ease, height 0.3s ease;
+}
+
+.my-video-container:hover {
+  transform: scale(1.05);
 }
 
 .my-video {
@@ -71,13 +78,14 @@
 
 .call-controls {
   position: absolute;
-  bottom: 40px;
+  bottom: var(--spacing);
   left: 0;
   display: flex;
   justify-content: center;
-  gap: 16px;
+  gap: var(--spacing);
   width: 100%;
-  z-index: 5;
+  padding: var(--spacing);
+  z-index: 10;
 }
 
 .end-call {
@@ -85,18 +93,24 @@
   color: white;
   border: none;
   border-radius: 50%;
-  width: 60px;
-  height: 60px;
+  width: var(--control-size);
+  height: var(--control-size);
   font-size: 24px;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
 
 .end-call:hover {
   background-color: #d32f2f;
+  transform: scale(1.1);
+}
+
+.end-call:active {
+  transform: scale(0.95);
 }
 
 .incoming-call-notification {
@@ -105,11 +119,13 @@
   left: 50%;
   transform: translate(-50%, -50%);
   background-color: white;
-  padding: 20px;
-  border-radius: 8px;
+  padding: clamp(15px, 4vw, 20px);
+  border-radius: clamp(8px, 2vw, 12px);
   text-align: center;
   z-index: 3;
   box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  animation: scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  max-width: clamp(280px, 80vw, 360px);
 }
 
 .call-actions {
@@ -120,11 +136,22 @@
 
 .answer-call, .reject-call {
   border: none;
-  padding: 10px 20px;
-  border-radius: 30px;
+  padding: clamp(8px, 2vw, 10px) clamp(15px, 4vw, 20px);
+  border-radius: clamp(20px, 5vw, 30px);
   font-weight: bold;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.answer-call:hover, .reject-call:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+}
+
+.answer-call:active, .reject-call:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .answer-call {
@@ -142,9 +169,10 @@
   top: 20px;
   background-color: #ff5252;
   color: white;
-  padding: 10px;
-  border-radius: 5px;
+  padding: clamp(8px, 2vw, 12px);
+  border-radius: clamp(4px, 1vw, 6px);
   z-index: 4;
+  animation: slideInUp 0.5s ease;
 }
 
 video {
@@ -169,22 +197,29 @@ video {
   color: white;
   border: none;
   border-radius: 50%;
-  width: 56px;
-  height: 56px;
+  width: var(--control-size);
+  height: var(--control-size);
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
 
 .toggle-audio:hover, .toggle-video:hover {
   background-color: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+.toggle-audio:active, .toggle-video:active {
+  transform: scale(0.95);
 }
 
 .toggle-audio.disabled, .toggle-video.disabled {
   background-color: rgba(244, 67, 54, 0.7);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2) inset;
 }
 
 .toggle-audio.disabled:hover, .toggle-video.disabled:hover {
@@ -219,8 +254,8 @@ video {
   top: 60px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 4px 12px;
-  border-radius: 20px;
+  padding: clamp(3px, 1vw, 6px) clamp(8px, 2vw, 12px);
+  border-radius: clamp(15px, 4vw, 20px);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -228,6 +263,7 @@ video {
   z-index: 5;
   background-color: rgba(0, 0, 0, 0.5);
   color: white;
+  animation: fadeIn 0.5s ease;
 }
 
 .quality-indicator {
@@ -258,20 +294,25 @@ video {
   flex-direction: column;
   align-items: center;
   z-index: 5;
+  animation: fadeIn 0.5s ease;
 }
 
 .profile-image {
-  width: 160px;
-  height: 160px;
+  width: clamp(100px, 30vw, 160px);
+  height: clamp(100px, 30vw, 160px);
   border-radius: 50%;
   object-fit: cover;
   margin-bottom: 16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  border: 3px solid white;
+  animation: scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.2s both;
 }
 
 .profile-name {
   color: white;
   font-size: 18px;
   font-weight: bold;
+  animation: fadeIn 0.5s ease 0.4s both;
 }
 
 /* Call status area */
@@ -282,15 +323,18 @@ video {
   text-align: center;
   color: white;
   z-index: 5;
+  animation: fadeIn 0.5s ease;
 }
 
 .call-status h3 {
   margin: 0 0 8px 0;
+  font-size: clamp(1rem, 4vw, 1.2rem);
 }
 
 .call-status p {
   margin: 0;
   opacity: 0.8;
+  font-size: clamp(0.8rem, 3vw, 1rem);
 }
 
 /* Control button styles to match the reference */
@@ -372,9 +416,8 @@ video {
   }
   
   .toggle-audio, .toggle-video, .end-call {
-    width: 42px;
-    height: 42px;
-    font-size: 11px;
+    width: clamp(36px, 10vw, 42px);
+    height: clamp(36px, 10vw, 42px);
   }
   
   .user-profile .profile-image {
@@ -387,7 +430,7 @@ video {
   }
   
   .call-status {
-    bottom: 90px;
+    bottom: clamp(70px, 10vh, 90px);
   }
   
   .call-status h3 {
@@ -397,15 +440,20 @@ video {
   .call-status p {
     font-size: 14px;
   }
+  
+  .connection-quality {
+    font-size: 12px;
+    padding: 3px 8px;
+  }
 }
 
 /* Landscape orientation on mobile */
 @media (max-height: 500px) {
   .my-video-container {
-    bottom: 80px;
-    right: 16px;
-    width: 100px;
-    height: 70px;
+    bottom: clamp(16px, 4vh, 24px);
+    right: clamp(70px, 10vw, 90px);
+    width: clamp(80px, 15vw, 100px);
+    height: clamp(60px, 12vh, 70px);
   }
   
   .user-profile .profile-image {
@@ -415,10 +463,22 @@ video {
   }
   
   .call-controls {
-    bottom: 16px;
+    bottom: clamp(8px, 2vh, 16px);
+    right: clamp(8px, 2vw, 16px);
+    width: auto;
+    flex-direction: column;
   }
   
   .call-status {
-    bottom: 80px;
+    bottom: auto;
+    top: clamp(16px, 4vh, 24px);
+    left: clamp(16px, 4vw, 24px);
+    text-align: left;
+    width: auto;
+  }
+  
+  .user-profile {
+    top: 35%;
+    left: 30%;
   }
 }

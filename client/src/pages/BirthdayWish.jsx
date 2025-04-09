@@ -13,6 +13,9 @@ function BirthdayWish() {
   const containerRef = useRef(null);
   const [isMuted, setIsMuted] = useState(true); // Start muted for better UX
   const videoRef = useRef(null);
+  const [lastHeartPosition, setLastHeartPosition] = useState({ x: 0, y: 0 });
+  const [trailActive, setTrailActive] = useState(false);
+  const minHeartDistance = 30; // Minimum distance between hearts in pixels
 
   const heartPositions = Array(10).fill(0).map((_, i) => {
     const t = Math.PI / 2 + (i * ((2 * Math.PI) / 10));
@@ -360,8 +363,57 @@ function BirthdayWish() {
     }
   };
 
+  // Improved heart trail animation
+  const createHeartTrail = (e) => {
+    if (showPopups || showHeartAnimation) return;
+    
+    const currentPosition = { x: e.clientX, y: e.clientY };
+    
+    // Calculate distance from last heart position
+    const distance = Math.sqrt(
+      Math.pow(currentPosition.x - lastHeartPosition.x, 2) + 
+      Math.pow(currentPosition.y - lastHeartPosition.y, 2)
+    );
+    
+    // Only create a new heart if we've moved far enough
+    if (distance > minHeartDistance || !trailActive) {
+      setLastHeartPosition(currentPosition);
+      setTrailActive(true);
+      
+      const heart = document.createElement('div');
+      heart.className = 'heart-trail';
+      heart.innerHTML = '❤';
+      heart.style.position = 'fixed'; // Use fixed instead of absolute
+      heart.style.left = `${currentPosition.x}px`;
+      heart.style.top = `${currentPosition.y}px`;
+      heart.style.fontSize = `${16 + Math.random() * 10}px`; // Random size variation
+      heart.style.color = 'var(--primary-pink)';
+      heart.style.opacity = '0.9';
+      heart.style.pointerEvents = 'none';
+      heart.style.zIndex = '999';
+      heart.style.transform = 'translateY(0)';
+      heart.style.transition = 'transform 1s ease-out, opacity 1s ease-out';
+      
+      // Add to document
+      document.body.appendChild(heart);
+      
+      // Start animation after a small delay
+      setTimeout(() => {
+        heart.style.transform = `translateY(-${20 + Math.random() * 30}px) rotate(${Math.random() * 30 - 15}deg)`;
+        heart.style.opacity = '0';
+      }, 10);
+      
+      // Remove the heart after animation completes
+      setTimeout(() => {
+        if (document.body.contains(heart)) {
+          document.body.removeChild(heart);
+        }
+      }, 1100);
+    }
+  };
+
   return (
-    <div className="birthday-container" ref={containerRef}>
+    <div className="birthday-container" ref={containerRef} onMouseMove={createHeartTrail}>
       <div className="video-background">
         <video
           ref={videoRef}

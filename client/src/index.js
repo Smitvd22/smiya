@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
+import './styles/responsive.css';  // Add this line after other CSS imports
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 

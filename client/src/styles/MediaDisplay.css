@@ -4,9 +4,26 @@
   max-width: 100%;
   min-height: 150px;  /* Ensure a minimum height for visibility */
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: clamp(6px, 1.5vw, 8px);
   background-color: #f8f8f8;
   border: 1px solid #ddd;  /* Always show a border */
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  animation: mediaAppear 0.4s ease-out forwards;
+}
+
+@keyframes mediaAppear {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.media-display:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
 /* Make sure images are properly displayed */
@@ -15,66 +32,102 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
+  transition: opacity 0.3s ease;
+  will-change: opacity;
 }
 
 .image-container img {
   max-width: 100%;
-  max-height: 300px;
+  max-height: clamp(200px, 40vh, 300px);
   object-fit: contain;
+  border-radius: clamp(4px, 1vw, 8px);
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.image-container:hover img {
+  transform: scale(1.02);
 }
 
 .video-container video {
   max-width: 100%;
-  max-height: 300px;
+  max-height: clamp(200px, 40vh, 300px);
   display: block;
   margin: 0 auto;
+  border-radius: clamp(4px, 1vw, 8px);
+  transition: transform 0.4s ease;
+}
+
+.video-container:hover video {
+  transform: scale(1.02);
 }
 
 .audio-container {
-  padding: 10px;
+  padding: clamp(8px, 2vw, 10px);
+  transition: opacity 0.3s ease;
+  will-change: opacity;
 }
 
 .audio-container audio {
   width: 100%;
+  border-radius: clamp(4px, 1vw, 8px);
+  transition: all 0.3s ease;
+}
+
+.audio-container audio:focus {
+  outline: 2px solid rgba(33, 150, 243, 0.5);
 }
 
 .download-button {
   position: absolute;
-  bottom: 10px;
-  right: 10px;
+  bottom: clamp(8px, 2vw, 10px);
+  right: clamp(8px, 2vw, 10px);
+  padding: clamp(5px, 1.5vw, 8px) clamp(8px, 2vw, 10px);
+  font-size: clamp(0.8rem, 2vw, 0.9rem);
+  border-radius: clamp(3px, 1vw, 4px);
+  transition: all 0.3s ease;
+  opacity: 0.8;
   background-color: rgba(33, 150, 243, 0.8);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 5px 10px;
-  cursor: pointer;
+}
+
+.media-display:hover .download-button {
+  opacity: 1;
 }
 
 .download-button:hover {
-  background-color: rgba(0, 0, 0, 0.8);
+  transform: translateY(-2px);
+  background-color: rgba(33, 150, 243, 1);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+.download-button:active {
+  transform: translateY(0);
 }
 
 .media-loading {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: clamp(15px, 4vw, 20px);
   background-color: #f1f1f1;
   color: #555;
-  min-height: 100px;
+  min-height: clamp(80px, 20vh, 100px);
+  border-radius: clamp(4px, 1vw, 8px);
+  font-size: clamp(0.9rem, 2vw, 1rem);
 }
 
 .media-error {
   background-image: linear-gradient(45deg, #f8f8f8 25%, #eee 25%, #eee 50%, #f8f8f8 50%, #f8f8f8 75%, #eee 75%, #eee 100%);
   background-size: 20px 20px;
-  padding: 15px;
+  padding: clamp(15px, 4vw, 20px);
   color: #d32f2f;
   text-align: center;
-  min-height: 100px;
+  min-height: clamp(80px, 20vh, 100px);
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  border-radius: clamp(4px, 1vw, 8px);
+  font-size: clamp(0.9rem, 2vw, 1rem);
 }
 
 .media-error button {
@@ -92,12 +145,12 @@
 }
 
 .spinner {
-  width: 20px;
-  height: 20px;
-  border: 3px solid rgba(0, 0, 0, 0.1);
+  width: clamp(16px, 4vw, 20px);
+  height: clamp(16px, 4vw, 20px);
+  border: clamp(2px, 0.5vw, 3px) solid rgba(0, 0, 0, 0.1);
   border-top-color: #2196f3;
   border-radius: 50%;
-  animation: spin 1s ease-in-out infinite;
+  animation: spin 1s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
   margin-right: 10px;
 }
 
@@ -132,4 +185,21 @@
 }
 .media-placeholder::after {
   content: "Loading media...";
+}
+
+/* Mobile optimizations */
+@media (max-width: 480px) {
+  .media-display {
+    margin: 8px 0;
+    min-height: 100px;
+  }
+  
+  .image-container img, .video-container video {
+    max-height: 200px;
+  }
+  
+  .media-error button, .open-link {
+    font-size: 0.9rem;
+    padding: 6px 12px;
+  }
 }

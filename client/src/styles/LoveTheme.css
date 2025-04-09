@@ -1,0 +1,139 @@
+:root {
+  --primary-pink: #ff6b8b;
+  --secondary-pink: #ff8fa3;
+  --light-pink: #ffd1dc;
+  --primary-cyan: #4dd0e1;
+  --secondary-cyan: #80deea;
+  --light-cyan: #b3e5fc;
+  --dark-cyan: #00acc1;
+  --gradient-love: linear-gradient(135deg, var(--primary-cyan), var(--primary-pink));
+  --gradient-soft: linear-gradient(135deg, var(--secondary-cyan), var(--secondary-pink));
+  --heart-color: #e91e63;
+}
+
+/* Floating hearts background */
+.floating-hearts {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: -1;
+  overflow: hidden;
+}
+
+.heart {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background-color: var(--light-pink);
+  transform: rotate(45deg);
+  opacity: 0.2;
+  animation: float-heart 15s linear infinite;
+}
+
+.heart::before, .heart::after {
+  content: "";
+  width: 20px;
+  height: 20px;
+  background-color: var(--light-pink);
+  border-radius: 50%;
+  position: absolute;
+}
+
+.heart::before {
+  top: -10px;
+  left: 0;
+}
+
+.heart::after {
+  left: -10px;
+  top: 0;
+}
+
+.heart:nth-child(2n) {
+  background-color: var(--light-cyan);
+}
+.heart:nth-child(2n)::before, .heart:nth-child(2n)::after {
+  background-color: var(--light-cyan);
+}
+
+@keyframes float-heart {
+  0% {
+    transform: rotate(45deg) translateY(0) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.2;
+  }
+  90% {
+    opacity: 0.2;
+  }
+  100% {
+    transform: rotate(45deg) translateY(-100vh) translateX(20px);
+    opacity: 0;
+  }
+}
+
+/* Global style overrides */
+body {
+  background-color: #fcf7f8;
+}
+
+/* Button styles */
+.btn-love {
+  background: var(--gradient-love);
+  color: white;
+  border: none;
+  border-radius: 25px;
+  padding: 10px 24px;
+  box-shadow: 0 4px 10px rgba(255, 107, 139, 0.3);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.btn-love:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 15px rgba(255, 107, 139, 0.4);
+}
+
+.btn-love-outline {
+  background: transparent;
+  color: var(--primary-pink);
+  border: 2px solid var(--primary-pink);
+  border-radius: 25px;
+  padding: 8px 22px;
+  transition: all 0.3s ease;
+}
+
+.btn-love-outline:hover {
+  background: rgba(255, 107, 139, 0.1);
+  transform: translateY(-2px);
+}
+
+/* Card styles */
+.love-card {
+  border-radius: 15px;
+  background: white;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  border-top: 4px solid var(--primary-cyan);
+  transition: all 0.3s ease;
+}
+
+.love-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Heart pulse animation */
+@keyframes heart-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.pulse-heart {
+  animation: heart-pulse 1.5s infinite;
+  color: var(--heart-color);
+}

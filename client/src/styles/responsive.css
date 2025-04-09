@@ -1,0 +1,320 @@
+/* Global Responsive Enhancements */
+:root {
+  --primary-color: #2196f3;
+  --primary-dark: #0d8aee;
+  --secondary-color: #ff7b89;
+  --secondary-dark: #ff5d6e;
+  --success-color: #4caf50;
+  --danger-color: #f44336;
+  --text-dark: #333;
+  --text-medium: #666;
+  --text-light: #9e9e9e;
+  --transition-quick: all 0.2s ease;
+  --transition-default: all 0.3s ease;
+  --transition-slow: all 0.5s ease;
+}
+
+/* Global improvements */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-size: 16px;
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Better readability */
+p, li, input, textarea, button {
+  font-size: clamp(0.875rem, 2vw, 1rem);
+  letter-spacing: 0.015rem;
+}
+
+h1 {
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+  line-height: 1.2;
+  margin-bottom: 1rem;
+}
+
+h2 {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  line-height: 1.3;
+}
+
+h3 {
+  font-size: clamp(1.25rem, 3vw, 1.8rem);
+  line-height: 1.4;
+}
+
+/* Enhanced focus states for accessibility */
+a:focus, button:focus, input:focus, textarea:focus {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+  transition: outline-offset 0.2s ease;
+}
+
+/* Improved touch targets for mobile */
+button, 
+.nav-item, 
+.dropdown-item,
+input[type="submit"] {
+  min-height: 44px;
+  padding: clamp(8px, 2vw, 12px) clamp(12px, 3vw, 24px);
+}
+
+/* Enhanced transitions for all interactive elements */
+a, button, .nav-item, .dropdown-item, input, 
+.profile-menu, .birthday-card, .feature-card {
+  transition: var(--transition-default);
+}
+
+/* Animation library */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes heartbeat {
+  0% { transform: scale(1); }
+  14% { transform: scale(1.1); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.15); }
+  70% { transform: scale(1); }
+}
+
+/* Add animation classes */
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease forwards;
+}
+
+.animate-slideUp {
+  animation: slideInUp 0.5s ease forwards;
+}
+
+.animate-slideLeft {
+  animation: slideInFromLeft 0.5s ease forwards;
+}
+
+.animate-slideRight {
+  animation: slideInFromRight 0.5s ease forwards;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.4s ease forwards;
+}
+
+.animate-heartbeat {
+  animation: heartbeat 1.5s infinite;
+}
+
+/* Add animation delay classes */
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
+.delay-500 { animation-delay: 0.5s; }
+
+/* Enhanced navbar */
+.navbar {
+  height: clamp(60px, 10vw, 70px);
+}
+
+.navbar-logo {
+  font-size: clamp(1.4rem, 4vw, 1.8rem);
+}
+
+/* Mobile menu improvements */
+@media (max-width: 768px) {
+  .nav-menu {
+    padding: 10px;
+    gap: 8px;
+  }
+  
+  .nav-item {
+    width: 100%;
+    text-align: center;
+    padding: 12px;
+    margin: 4px 0;
+  }
+  
+  .profile-dropdown {
+    width: 100%;
+    right: 0;
+    left: 0;
+    top: 60px;
+    border-radius: 0;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  }
+}
+
+/* Chat improvements */
+.chat-container {
+  height: calc(100vh - clamp(60px, 10vw, 70px) - 20px);
+  margin: clamp(60px, 10vw, 80px) auto 0;
+  max-width: 100%;
+  width: clamp(300px, 100%, 800px);
+}
+
+.messages-container {
+  padding: clamp(10px, 3vw, 15px);
+}
+
+.message {
+  max-width: clamp(60%, 70%, 85%);
+  padding: clamp(8px, 2vw, 15px);
+  margin-bottom: clamp(8px, 2vw, 10px);
+  border-radius: clamp(14px, 4vw, 18px);
+}
+
+/* Birthday cards improvements */
+.birthday-timeline {
+  padding: clamp(20px, 5vw, 40px) 0;
+}
+
+.birthday-card {
+  transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
+              opacity 0.8s ease, 
+              box-shadow 0.3s ease;
+}
+
+.birthday-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+}
+
+.card-image {
+  height: clamp(180px, 30vw, 250px);
+}
+
+.card-content {
+  padding: clamp(15px, 4vw, 25px);
+}
+
+.card-content h3 {
+  margin-bottom: clamp(10px, 3vw, 15px);
+}
+
+/* Video call improvements */
+.video-call-container video {
+  object-fit: cover;
+}
+
+.my-video-container {
+  width: clamp(80px, 25vw, 160px);
+  height: clamp(60px, 15vw, 120px);
+  right: clamp(8px, 3vw, 16px);
+  bottom: clamp(80px, 15vh, 120px);
+}
+
+.call-controls {
+  bottom: clamp(16px, 4vh, 24px);
+  gap: clamp(8px, 2vw, 16px);
+}
+
+.toggle-audio, .toggle-video, .end-call {
+  width: clamp(42px, 10vw, 60px);
+  height: clamp(42px, 10vw, 60px);
+}
+
+/* Enhanced popups with animations */
+.birthday-popup {
+  max-width: clamp(250px, 80vw, 400px);
+  animation: scaleIn 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
+}
+
+/* Media player improvements */
+.media-display img,
+.media-display video {
+  max-height: clamp(200px, 50vh, 300px);
+  border-radius: clamp(4px, 1vw, 8px);
+}
+
+/* Additional responsive improvements for all screen sizes */
+@media (max-width: 480px) {
+  body {
+    font-size: 15px;
+  }
+  
+  .profile-image {
+    width: clamp(80px, 25vw, 120px);
+    height: clamp(80px, 25vw, 120px);
+  }
+  
+  .message-form {
+    padding: 10px;
+  }
+  
+  .message-form input {
+    padding: 8px 12px;
+    font-size: 0.95rem;
+  }
+  
+  .message-form button {
+    padding: 8px 16px;
+  }
+}
+
+/* Medium screens */
+@media (min-width: 481px) and (max-width: 768px) {
+  .timeline-item {
+    padding-left: 70px !important;
+    padding-right: 10px !important;
+  }
+  
+  .feature-card {
+    padding: clamp(15px, 4vw, 24px);
+  }
+}
+
+/* Small height screens */
+@media (max-height: 600px) {
+  .call-status {
+    bottom: clamp(70px, 10vh, 90px);
+  }
+  
+  .my-video-container {
+    bottom: clamp(70px, 10vh, 90px);
+    width: clamp(80px, 15vw, 100px);
+    height: clamp(60px, 10vh, 70px);
+  }
+}

@@ -13,6 +13,7 @@ import { getCurrentUser } from './services/authService';
 import { CallProvider } from './contexts/CallContext';
 import './utils/processPolyfill';
 import './App.css';
+import './styles/LoveTheme.css';
 
 function App() {
   // Function to check if user is authenticated
@@ -30,6 +31,20 @@ function App() {
     >
       <CallProvider>
         <div className="App">
+          <div className="floating-hearts">
+            {[...Array(15)].map((_, i) => (
+              <div 
+                key={`heart-${i}`} 
+                className="heart" 
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  animationDuration: `${15 + Math.random() * 10}s`,
+                  animationDelay: `${Math.random() * 5}s`,
+                  transform: `scale(${0.5 + Math.random() * 0.5}) rotate(45deg)`,
+                }}
+              />
+            ))}
+          </div>
           <Navbar />
           <Routes>
             {/* Public routes */}

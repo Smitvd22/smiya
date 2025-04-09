@@ -3,6 +3,9 @@
   margin: 0 auto;
   padding: 20px;
   position: relative;
+  min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 .birthday-header {
@@ -15,7 +18,7 @@
 .birthday-header h1 {
   font-size: 3rem;
   margin-bottom: 16px;
-  background: linear-gradient(45deg, #ff7b89, #8a5082, #6f5980, #3c6997);
+  background: linear-gradient(45deg, var(--primary-pink), var(--primary-cyan), var(--secondary-pink), var(--dark-cyan));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -56,14 +59,19 @@
   background-color: white;
   border-radius: 15px;
   overflow: hidden;
-  box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-  transition: box-shadow 0.3s ease, opacity 0.05s linear;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.3s ease, opacity 0.05s linear, transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   will-change: transform, opacity;
+  transform: scale(0.1);
+  opacity: 0;
 }
 
 /* Add styles for active cards */
 .birthday-card.card-active {
   box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+  transform: scale(1) !important;
+  opacity: 1 !important;
+  box-shadow: 0 15px 30px rgba(0,0,0,0.15);
 }
 
 /* Left cards originate from right side (where dot is) */
@@ -76,11 +84,11 @@
   transform-origin: left center;
 }
 
-.card-theme-blue { border-top: 5px solid #4a90e2; }
-.card-theme-purple { border-top: 5px solid #9b59b6; }
-.card-theme-green { border-top: 5px solid #2ecc71; }
-.card-theme-orange { border-top: 5px solid #e67e22; }
-.card-theme-pink { border-top: 5px solid #e91e63; }
+.card-theme-blue { border-top: 5px solid var(--primary-cyan); }
+.card-theme-purple { border-top: 5px solid var(--primary-pink); }
+.card-theme-green { border-top: 5px solid var(--secondary-cyan); }
+.card-theme-orange { border-top: 5px solid var(--secondary-pink); }
+.card-theme-pink { border-top: 5px solid var(--heart-color); }
 
 .card-image {
   height: 250px; /* Increased height */
@@ -91,11 +99,11 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.5s ease;
+  transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .birthday-card:hover .card-image img {
-  transform: scale(1.05);
+  transform: scale(1.08);
 }
 
 .card-content {
@@ -140,7 +148,7 @@
 }
 
 .share-wish {
-  background-color: #4a90e2;
+  background: var(--gradient-love);
   color: white;
   border: none;
   padding: 10px 20px;
@@ -148,19 +156,19 @@
   font-weight: 500;
   margin-top: 15px;
   cursor: pointer;
-  transition: background-color 0.3s;
-  width: 100%;
+  transition: all 0.3s ease;
 }
 
 .share-wish:hover {
-  background-color: #3a80d2;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 15px rgba(255, 107, 139, 0.4);
 }
 
 .create-wish-section {
   margin-top: 50px;
   text-align: center;
   padding: 40px;
-  background-color: #f9f9f9;
+  background: linear-gradient(135deg, rgba(77, 208, 225, 0.1), rgba(255, 107, 139, 0.1));
   border-radius: 15px;
 }
 
@@ -177,7 +185,7 @@
 }
 
 .create-wish-btn {
-  background-color: #e67e22;
+  background: var(--gradient-love);
   color: white;
   border: none;
   padding: 12px 30px;
@@ -185,11 +193,12 @@
   font-size: 1.1rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.3s;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .create-wish-btn:hover {
-  background-color: #d35400;
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
 }
 
 /* Timeline styling */
@@ -206,7 +215,7 @@
   bottom: 0;
   left: 50%;
   width: 4px;
-  background: linear-gradient(180deg, #ff7b89, #8a5082, #6f5980, #3c6997);
+  background: linear-gradient(180deg, var(--primary-pink), var(--primary-cyan), var(--secondary-pink), var(--secondary-cyan));
   transform: translateX(-50%);
 }
 
@@ -237,12 +246,18 @@
   left: 50%;
   width: 20px;
   height: 20px;
-  background-color: #ff7b89;
+  background-color: var(--primary-pink);
   border-radius: 50%;
   transform: translateX(-50%);
   z-index: 2;
   border: 4px solid white;
-  box-shadow: 0 0 0 4px rgba(255, 123, 137, 0.3);
+  box-shadow: 0 0 0 4px rgba(255, 107, 139, 0.3);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.timeline-item:hover .timeline-dot {
+  transform: translateX(-50%) scale(1.2);
+  box-shadow: 0 0 0 6px rgba(255, 107, 139, 0.3);
 }
 
 /* Update timeline date position styling */
@@ -309,7 +324,7 @@
   }
   
   .birthday-header h1 {
-    font-size: 2.5rem;
+    font-size: clamp(1.8rem, 6vw, 3rem);
   }
 
   .timeline-line {
@@ -318,7 +333,7 @@
   
   .timeline-item {
     padding-left: 80px !important;
-    padding-right: 0 !important;
+    padding-right: 10px !important;
     justify-content: flex-start !important;
   }
   
@@ -331,10 +346,32 @@
     left: 80px !important;
     right: auto !important;
     text-align: left !important;
+    font-size: clamp(0.9rem, 3vw, 1.1rem);
   }
 
   .birthday-card {
     transform-origin: left center !important;
+  }
+
+  .popup-btn {
+    padding: 8px 20px;
+    font-size: clamp(0.9rem, 3vw, 1rem);
+  }
+}
+
+@media (max-width: 480px) {
+  .birthday-popup {
+    max-width: 85vw;
+    padding: 20px;
+  }
+  
+  .popup-buttons {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .popup-btn {
+    width: 100%;
   }
 }
 
@@ -361,6 +398,7 @@
   -webkit-backdrop-filter: blur(6px);
   z-index: 999;
   transition: all 0.3s ease;
+  animation: fadeIn 0.4s ease forwards;
 }
 
 /* Ensure the popup has higher z-index than the overlay */
@@ -368,19 +406,19 @@
   position: fixed;
   top: 50%;
   left: 50%;
-  background-color: white;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  border-left: 5px solid var(--primary-cyan);
   padding: 25px 35px;
-  border-radius: 10px;
-  box-shadow: 0 5px 30px rgba(0,0,0,0.3);
-  z-index: 1000;
   text-align: center;
-  animation: popIn 0.5s forwards;
+  animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   transition: transform 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
 }
 
 .second-popup {
-  background-color: #fff8dc;
-  border-left: 5px solid #ffc107;
+  background: #fff8dc;
+  border-left: 5px solid var(--primary-pink);
 }
 
 .popup-buttons {
@@ -400,12 +438,12 @@
 }
 
 .yes-btn {
-  background-color: #4caf50;
+  background: var(--gradient-love);
   color: white;
 }
 
 .yes-btn:hover {
-  background-color: #388e3c;
+  background: var(--primary-pink);
   transform: scale(1.05);
 }
 
@@ -421,11 +459,17 @@
 @keyframes popIn {
   0% {
     opacity: 0;
-    transform: scale(0.8);
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+  70% {
+    transform: translate(-50%, -50%) scale(0.95);
   }
   100% {
     opacity: 1;
-    transform: scale(1);
+    transform: translate(-50%, -50%) scale(1);
   }
 }
 
@@ -458,6 +502,7 @@
 
 /* Connection line animation */
 .connection-line {
+  stroke: var(--primary-pink);
   animation: dashAnimation 1s linear forwards;
   stroke-dashoffset: 1000;
 }
@@ -471,13 +516,13 @@
 /* Replace the existing heart animation styles */
 
 .heart-fill {
-  fill: #ff69b4;
+  fill: var(--primary-pink);
   transform-origin: center;
   transform-box: fill-box;
   animation: 
-    heartFadeIn 0.5s ease-out forwards,
-    heartPump 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.5s 2,
-    heartZoom 1s ease-in-out 2.1s forwards;
+    heartFadeIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards,
+    heartPump 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.6s 2,
+    heartZoom 1.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) 2.3s forwards;
 }
 
 @keyframes heartFadeIn {
@@ -486,8 +531,13 @@
 }
 
 @keyframes heartPump {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.4); }
+  0% { transform: scale(1); }
+  15% { transform: scale(1.25); }
+  30% { transform: scale(1); }
+  45% { transform: scale(1.35); }
+  60% { transform: scale(1); }
+  75% { transform: scale(1.2); }
+  100% { transform: scale(1); }
 }
 
 @keyframes heartZoom {
@@ -534,12 +584,12 @@
 /* Add shake animation for "No" click feedback */
 @keyframes shakeEffect {
   0%, 100% { transform: translate(-50%, -50%); }
-  10%, 30%, 50%, 70%, 90% { transform: translate(-52%, -50%); }
-  20%, 40%, 60%, 80% { transform: translate(-48%, -50%); }
+  10%, 30%, 50%, 70%, 90% { transform: translate(-53%, -50%); }
+  20%, 40%, 60%, 80% { transform: translate(-47%, -50%); }
 }
 
 .shake-animation {
-  animation: shakeEffect 0.5s ease-in-out;
+  animation: shakeEffect 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
 
 /* Video Background Styles */
@@ -582,10 +632,31 @@
   align-items: center;
   justify-content: center;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s ease;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
+              background 0.3s ease;
 }
 
 .sound-toggle:hover {
-  transform: scale(1.1);
+  transform: scale(1.15);
   background: rgba(255, 255, 255, 0.9);
+}
+
+.sound-toggle:active {
+  transform: scale(0.95);
+}
+
+/* Add this to your existing CSS file */
+
+@keyframes float-up {
+  0% { transform: translateY(0) rotate(0); opacity: 0.9; }
+  100% { transform: translateY(-40px) rotate(10deg); opacity: 0; }
+}
+
+.heart-trail {
+  animation: float-up 1.2s ease-out forwards;
+  position: fixed;
+  pointer-events: none;
+  z-index: 999;
+  text-shadow: 0 0 3px rgba(255, 255, 255, 0.5);
+  will-change: transform, opacity;
 }

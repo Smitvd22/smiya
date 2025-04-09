@@ -6,9 +6,8 @@ import '../styles/Navbar.css';
 const Navbar = () => {
   const [user, setUser] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [visible, setVisible] = useState(true);
-  const [prevScrollPos, setPrevScrollPos] = useState(0);
-  // const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showNavbar, setShowNavbar] = useState(true);
   const location = useLocation();
 
   // Update user state when location changes or component mounts
@@ -35,21 +34,36 @@ const Navbar = () => {
 
   // Handle scroll events to show/hide navbar
   useEffect(() => {
+    let lastScrollY = window.scrollY;
+    let ticking = false;
+    
     const handleScroll = () => {
-      const currentScrollPos = window.scrollY;
-      
-      // Make navbar visible when scrolling up or at the top
-      setVisible((prevScrollPos > currentScrollPos) || currentScrollPos < 10);
-      
-      setPrevScrollPos(currentScrollPos);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          // Direction detection with stronger threshold for mobile
+          const scrollingDown = window.scrollY > lastScrollY + 5;
+          const scrollingUp = window.scrollY < lastScrollY - 5;
+          
+          if (scrollingDown && window.scrollY > 50) {
+            setShowNavbar(false);
+          } else if (scrollingUp) {
+            setShowNavbar(true);
+          }
+          
+          lastScrollY = window.scrollY;
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
-    
-    window.addEventListener('scroll', handleScroll);
-    
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, [prevScrollPos]);
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const toggleMenu = () => {
+    setMenuOpen(!menuOpen);
+  };
 
   const handleLogout = () => {
     // Clear user data
@@ -63,13 +77,19 @@ const Navbar = () => {
   };
 
   return (
-    <nav className={`navbar ${visible ? 'navbar-visible' : 'navbar-hidden'}`}>
+    <nav className={`navbar ${showNavbar ? 'navbar-visible' : 'navbar-hidden'}`}>
       <div className="navbar-container">
         <Link to="/" className="navbar-logo">
           Smiya
         </Link>
         
-        <div className="nav-menu">
+        <div className={`menu-toggle ${menuOpen ? 'active' : ''}`} onClick={toggleMenu}>
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        
+        <div className={`nav-menu ${menuOpen ? 'active' : ''}`}>
           <Link to="/birthday" className="nav-item birthday-nav-item">
             🎂 Birthday Wishes
           </Link>
