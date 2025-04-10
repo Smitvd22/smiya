@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import '../styles/BirthdayWish.css';
+import '../styles/BirthdayWishResponsive.css'; // Add this new import
 
 function BirthdayWish() {
   const cards = useRef([]);
@@ -433,16 +434,12 @@ function BirthdayWish() {
 
   // Ensure popups stay within viewport bounds
   const getConstrainedPosition = (position, index) => {
-    // Use state variables instead of accessing window properties directly
-    // const viewportWidth = window.innerWidth;
-    // const viewportHeight = window.innerHeight;
-    
-    // Estimate popup dimensions (scaled)
-    const popupWidth = 250 * scale;
-    const popupHeight = 180 * scale; // Approximate height
+    // Reduced popup dimensions by 20%
+    const popupWidth = 200 * scale;  // Reduced from 250
+    const popupHeight = 144 * scale; // Reduced from 180
     
     // Calculate boundaries (with some padding)
-    const padding = 20;
+    const padding = 16;  // Reduced from 20
     const maxX = (viewportWidth / 2) - (popupWidth / 2) - padding;
     const maxY = (viewportHeight / 2) - (popupHeight / 2) - padding;
     
@@ -532,9 +529,9 @@ function BirthdayWish() {
                   top: `calc(50% + ${safePos.y}px)`,
                   left: `calc(50% + ${safePos.x}px)`,
                   transform: 'translate(-50%, -50%)',
-                  maxWidth: `${Math.min(250 * scale, viewportWidth * 0.8)}px`,
-                  padding: `${Math.max(10, 20 * scale)}px ${Math.max(15, 30 * scale)}px`,
-                  fontSize: `${scale > 0.8 ? '1em' : '0.9em'}`,
+                  maxWidth: `${Math.min(200 * scale, viewportWidth * 0.7)}px`, // Reduced from 250 to 200
+                  padding: `${Math.max(8, 16 * scale)}px ${Math.max(12, 24 * scale)}px`, // Reduced padding by 20%
+                  fontSize: `${scale > 0.8 ? '0.8em' : '0.72em'}`, // Reduced from 1em/0.9em to 0.8em/0.72em
                   zIndex: index === activePopupIndex ? 1002 : 1001
                 }}
               >

@@ -1,0 +1,55 @@
+/* Reduced text sizes for BirthdayWish component */
+
+.birthday-popup h3 {
+  font-size: 1.12rem; /* Reduced from default 1.4rem */
+  margin-bottom: 10px;
+}
+
+.popup-btn {
+  font-size: 0.88rem; /* Reduced from default 1.1rem */
+  padding: 8px 20px;
+}
+
+.birthday-header h1 {
+  font-size: 2.4rem; /* Reduced from 3rem */
+}
+
+.birthday-header p {
+  font-size: 0.96rem; /* Reduced from 1.2rem */
+}
+
+.card-content h3 {
+  font-size: 1.44rem; /* Reduced from 1.8rem */
+}
+
+.card-message {
+  font-size: 0.88rem; /* Reduced from 1.1rem */
+}
+
+.card-sender {
+  font-size: 0.88rem;
+}
+
+.timeline-date {
+  font-size: 0.88rem; /* Reduced from 1.1rem */
+}
+
+/* Media query adjustments for smaller screens */
+@media (max-width: 768px) {
+  .birthday-popup {
+    max-width: 80vw !important; 
+  }
+  
+  .birthday-popup h3 {
+    font-size: 1rem; 
+  }
+  
+  .popup-btn {
+    font-size: 0.8rem;
+    padding: 6px 16px;
+  }
+  
+  .birthday-header h1 {
+    font-size: clamp(1.4rem, 5vw, 2.4rem);
+  }
+}

@@ -206,6 +206,30 @@ a, button, .nav-item, .dropdown-item, input,
   border-radius: clamp(14px, 4vw, 18px);
 }
 
+/* Additional mobile optimizations for chat */
+@media (max-width: 768px) {
+  .chat-container {
+    border-radius: 0;
+    width: 100%;
+    top: clamp(50px, 10vw, 70px); /* Ensure it starts right below navbar */
+    height: calc(100vh - clamp(50px, 10vw, 70px));
+  }
+  
+  .messages-container {
+    padding: clamp(8px, 2vw, 15px);
+    max-height: calc(100vh - clamp(50px, 10vw, 70px) - 100px);
+  }
+  
+  .chat-header {
+    padding: 10px;
+    height: auto;
+  }
+  
+  .message-form {
+    padding: 8px;
+  }
+}
+
 /* Birthday cards improvements */
 .birthday-timeline {
   padding: clamp(20px, 5vw, 40px) 0;

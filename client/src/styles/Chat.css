@@ -1,13 +1,19 @@
+/* Update the chat container to start exactly below navbar */
 .chat-container {
+  position: fixed;
+  top: clamp(50px, 10vw, 70px); /* Match navbar height */
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   flex-direction: column;
-  height: 90vh;
-  max-width: 800px;
-  margin: 80px auto 0; /* Added top margin to push below navbar */
-  background-color: white;
-  border-radius: 20px;
-  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+  width: clamp(300px, 100%, 800px);
+  margin: 0 auto;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   overflow: hidden;
+  height: calc(100vh - clamp(50px, 10vw, 70px)); /* Full height minus navbar */
 }
 
 .chat-header {
@@ -37,13 +43,17 @@
   padding: 5px 10px;
 }
 
+/* Ensure messages container has proper scroll containment */
 .messages-container {
   flex-grow: 1;
   padding: 15px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  position: relative; /* For positioning the spinner */
+  position: relative;
+  height: 100%;
+  max-height: calc(100vh - clamp(50px, 10vw, 70px) - 120px); /* Account for header and input area */
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
 }
 
 .loading-messages, .no-messages {
@@ -83,13 +93,17 @@
   margin-top: 4px;
 }
 
+/* Keep the message form at the bottom */
 .message-form {
-  display: flex;
+  position: sticky;
+  bottom: 0;
+  width: 100%;
   padding: 15px;
-  border-top: 1px solid #eaeaea;
-  background-color: #f5f5f5;
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
+  background: white;
+  border-top: 1px solid #eee;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .message-form input {
