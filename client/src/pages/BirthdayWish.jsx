@@ -17,6 +17,20 @@ function BirthdayWish() {
   const [trailActive, setTrailActive] = useState(false);
   const minHeartDistance = 30; // Minimum distance between hearts in pixels
 
+  const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
+  const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+
+  // Update viewport dimensions on resize
+  useEffect(() => {
+    const handleResize = () => {
+      setViewportWidth(window.innerWidth);
+      setViewportHeight(window.innerHeight);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const heartPositions = Array(10).fill(0).map((_, i) => {
     const t = Math.PI / 2 + (i * ((2 * Math.PI) / 10));
     const baseScale = 250;
@@ -40,12 +54,12 @@ function BirthdayWish() {
   }));
 
   const popupContent = [
-    { title: "1?", yesText: "Yes", noText: "No" },
-    { title: "2?", yesText: "Yes", noText: "No" },
-    { title: "3?", yesText: "Yes", noText: "No" },
-    { title: "4?", yesText: "Yes", noText: "No" },
-    { title: "5?", yesText: "Yes", noText: "No" },
-    { title: "6?", yesText: "Yes", noText: "No" }
+    { title: "Are you the most cutest girl?", yesText: "Yes", noText: "No" },
+    { title: "Are you the most pretiest girl?", yesText: "Yes", noText: "No" },
+    { title: "Are you the most gorgeous girl", yesText: "Yes", noText: "No" },
+    { title: "Are you the most beautifull girl?", yesText: "Yes", noText: "No" },
+    { title: "Are you Smit's Wife?", yesText: "Yes", noText: "No" },
+    { title: "Heart completed!!!", yesText: "Yes", noText: "No" }
   ];
 
   useLayoutEffect(() => {
@@ -90,9 +104,6 @@ function BirthdayWish() {
   useEffect(() => {
     const handleScroll = () => {
       requestAnimationFrame(() => {
-        const viewportHeight = window.innerHeight;
-        // const scrollPosition = window.scrollY;
-        
         cards.current.forEach(card => {
           // Get card's position relative to the viewport
           const rect = card.getBoundingClientRect();
@@ -102,28 +113,18 @@ function BirthdayWish() {
           const distanceFromCenter = Math.abs(cardCenter - viewportHeight / 2);
           const maxDistance = viewportHeight * 0.8; // Max distance to consider
           
-          // Calculate scale based on position (1 when centered, smaller as it moves away)
-          let scale;
+          // Calculate visibility ratio - 1 when at center, 0 when at max distance
+          const visibilityRatio = 1 - Math.min(distanceFromCenter / maxDistance, 1);
           
-          if (distanceFromCenter >= maxDistance) {
-            // Card is far from center - minimum scale (zoomed out)
-            scale = 0.1;
+          // Apply transform and opacity based on distance
+          card.style.opacity = 0.4 + (visibilityRatio * 0.6);
+          card.style.transform = `scale(${0.8 + (visibilityRatio * 0.2)})`;
+          
+          // Add/remove visible class based on visibility threshold
+          if (visibilityRatio > 0.2) {
+            card.classList.add('card-visible');
           } else {
-            // Card is approaching center - gradually increase scale
-            // Use easeOutQuad formula for smoother transition
-            const progress = 1 - (distanceFromCenter / maxDistance);
-            scale = 0.1 + 0.9 * (progress * (2 - progress));
-          }
-          
-          // Apply the scale transform
-          card.style.transform = `scale(${scale})`;
-          card.style.opacity = Math.max(0, scale - 0.1) * 1.1; // Fade in as it scales
-          
-          // Set active state for fully visible cards
-          if (scale > 0.8) {
-            card.classList.add('card-active');
-          } else {
-            card.classList.remove('card-active');
+            card.classList.remove('card-visible');
           }
         });
       });
@@ -138,7 +139,7 @@ function BirthdayWish() {
     return () => {
       window.removeEventListener('scroll', handleScroll);
     };
-  }, []);
+  }, [viewportHeight]); // Add viewportHeight as dependency
 
   useEffect(() => {
     // Attempt to play the video when component mounts
@@ -264,84 +265,102 @@ function BirthdayWish() {
     {
       id: 1,
       theme: 'blue',
-      date: 'May 12, 2023',
-      image: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d',
-      message: 'May your birthday be as wonderful and unique as you are!',
-      sender: 'Your Smiya Friends'
+      date: 'April 10 2005',
+      image: '/photos/10-4-05.jpg',
+      header: 'Angel On Earth',
+      message: 'This is the day when my cutuu was born and world became more beautifull.',
+      sender: 'Your Lover'
     },
     {
       id: 2,
       theme: 'purple',
-      date: 'June 23, 2023',
-      image: 'https://images.unsplash.com/photo-1611048661702-7b55eed346b4',
-      message: 'Another year of amazing adventures awaits you. Happy Birthday!',
-      sender: 'The Smiya Team'
+      date: 'April 07, 2022',
+      image: '/photos/7-4-22.jpg',
+      header: 'First Meeting',
+      message: 'The day when we first time saw our soulmates.',
+      sender: 'Your Baby'
     },
     {
       id: 3,
       theme: 'green',
-      date: 'August 4, 2023',
-      image: 'https://images.unsplash.com/photo-1612540139150-4c5f872a2cd3',
-      message: 'Wishing you a day filled with happiness and a year filled with joy!',
-      sender: 'Your Smiya Family'
+      date: 'October 03, 2022',
+      image: '/photos/3-10-22.jpg',
+      header: 'My Confession',
+      message: 'I was so mad in love with you that I could not resist more on keeping it to myself',
+      sender: 'Your Hubby'
     },
     {
       id: 4,
       theme: 'orange',
-      date: 'October 17, 2023',
-      image: 'https://images.unsplash.com/photo-1558301211-0d8c8ddee6ec',
-      message: 'May today be the start of a wonderful, glorious and joyful year to come.',
-      sender: 'Everyone at Smiya'
+      date: 'August 28, 2023',
+      image: '/photos/28-8-23.jpg',
+      header: 'Your Confession',
+      message: 'The best day of my life to know that its not one sided anymore',
+      sender: 'Your Soulmate'
     },
     {
       id: 5,
       theme: 'pink',
-      date: 'December 5, 2023',
-      image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176',
-      message: 'Count your life by smiles, not tears. Count your age by friends, not years!',
-      sender: 'With love from Smiya'
+      date: 'September 12, 2023',
+      image: '/photos/12-9-23.jpg',
+      header: 'Your Proposal',
+      message: 'That was the day when you said love you to me and made my life complete.',
+      sender: 'Your Better Half'
     },
     {
       id: 6,
       theme: 'pink',
-      date: 'December 5, 2023',
-      image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176',
-      message: 'Count your life by smiles, not tears. Count your age by friends, not years!',
-      sender: 'With love from Smiya'
+      date: 'November 7, 3',
+      image: '/photos/7-11-23.jpg',
+      header: 'First Date',
+      message: 'Took a bit time to change from friends to lovers but we made it at the end of the day',
+      sender: 'Father of your children'
     },
     {
       id: 7,
       theme: 'pink',
-      date: 'December 5, 2023',
-      image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176',
-      message: 'Count your life by smiles, not tears. Count your age by friends, not years!',
-      sender: 'With love from Smiya'
-    },
+      date: 'November 22, 2023',
+      image: '/photos/22-11-23.jpg',  // Update with actual file name if available
+      header: 'My Birthday',
+      message: 'Proposed you in live properly. Watched movie together for the first time.',
+      sender: 'With love from your love'
+    }, 
     {
       id: 8,
       theme: 'pink',
-      date: 'December 5, 2023',
-      image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176',
-      message: 'Count your life by smiles, not tears. Count your age by friends, not years!',
-      sender: 'With love from Smiya'
+      date: 'Jan 3, 2024',
+      image: '/photos/3-1-24.jpg',  // Update with actual file name if available
+      header: 'First Kiss',
+      message: 'It was pure love which made us to kiss each other.',
+      sender: 'Your cutuu'
     },
     {
       id: 9,
       theme: 'pink',
-      date: 'December 5, 2023',
-      image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176',
-      message: 'Count your life by smiles, not tears. Count your age by friends, not years!',
-      sender: 'With love from Smiya'
+      date: 'March 22, 2024',
+      image: '/photos/22-3-24.jpg',  // Update with actual file name if available
+      header: 'Our Home',
+      message: 'Really gave complete feeling of you being my wife',
+      sender: 'Your Naughty'
     },
     {
       id: 10,
       theme: 'pink',
-      date: 'December 5, 2023',
-      image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176',
-      message: 'Count your life by smiles, not tears. Count your age by friends, not years!',
-      sender: 'With love from Smiya'
+      date: 'March 27, 2024',
+      image: '/photos/27-3-23.jpg',  // Update with actual file name if available
+      header: 'Shopping, Mandir and Holi',
+      message: 'Did first time shopping together, Went Mandir together for first time and the played holi for the first time',
+      sender: 'Your paglu'
+    },
+    {
+      id: 11,
+      theme: 'pink',
+      date: 'September 12, 2024',
+      image: '/photos/12-9-24.jpg',  // Update with actual file name if available
+      header: 'First Anniversary',
+      message: 'Came all the way from surat to celebrate our First Anniversary together',
+      sender: 'Your paglu'
     }
-    
   ];
 
   const addToRefs = (el) => {
@@ -412,6 +431,31 @@ function BirthdayWish() {
     }
   };
 
+  // Ensure popups stay within viewport bounds
+  const getConstrainedPosition = (position, index) => {
+    // Use state variables instead of accessing window properties directly
+    // const viewportWidth = window.innerWidth;
+    // const viewportHeight = window.innerHeight;
+    
+    // Estimate popup dimensions (scaled)
+    const popupWidth = 250 * scale;
+    const popupHeight = 180 * scale; // Approximate height
+    
+    // Calculate boundaries (with some padding)
+    const padding = 20;
+    const maxX = (viewportWidth / 2) - (popupWidth / 2) - padding;
+    const maxY = (viewportHeight / 2) - (popupHeight / 2) - padding;
+    
+    // Constrain position values
+    const constrainedX = Math.max(-maxX, Math.min(maxX, position.x));
+    const constrainedY = Math.max(-maxY, Math.min(maxY, position.y));
+    
+    return {
+      x: constrainedX,
+      y: constrainedY
+    };
+  };
+
   return (
     <div className="birthday-container" ref={containerRef} onMouseMove={createHeartTrail}>
       <div className="video-background">
@@ -462,7 +506,7 @@ function BirthdayWish() {
             ))}
 
             {heartCompleted && (
-              <g transform={`translate(${window.innerWidth/2}, ${window.innerHeight/2})`}>
+              <g transform={`translate(${viewportWidth/2}, ${viewportHeight/2})`}>
                 <path
                   d={`M ${heartPositions[0].x * scale} ${heartPositions[0].y * scale}
                       ${heartPositions.slice(1).map(point => `L ${point.x * scale} ${point.y * scale}`).join(' ')}
@@ -475,18 +519,21 @@ function BirthdayWish() {
             )}
           </svg>
 
-          {showPopups && popupPositions.map((pos, index) => (
-            visitedPopups.includes(index) && (
+          {showPopups && popupPositions.map((pos, index) => {
+            // Get constrained position within viewport
+            const safePos = getConstrainedPosition(pos, index);
+            
+            return visitedPopups.includes(index) && (
               <div
                 key={`popup-${index}`}
-                className={`birthday-popup ${index !== activePopupIndex ? 'inactive-popup' : ''} ${index % 2 === 1 ? 'second-popup' : ''}`}
+                className={`birthday-popup ${index !== activePopupIndex ? 'inactive-popup' : ''} ${index % 2 === 0 ? 'cyan-popup' : 'pink-popup'}`}
                 style={{
                   position: 'fixed',
-                  top: `calc(50% + ${pos.y}px)`,
-                  left: `calc(50% + ${pos.x}px)`,
+                  top: `calc(50% + ${safePos.y}px)`,
+                  left: `calc(50% + ${safePos.x}px)`,
                   transform: 'translate(-50%, -50%)',
-                  maxWidth: `${250 * scale}px`,
-                  padding: `${20 * scale}px ${30 * scale}px`,
+                  maxWidth: `${Math.min(250 * scale, viewportWidth * 0.8)}px`,
+                  padding: `${Math.max(10, 20 * scale)}px ${Math.max(15, 30 * scale)}px`,
                   fontSize: `${scale > 0.8 ? '1em' : '0.9em'}`,
                   zIndex: index === activePopupIndex ? 1002 : 1001
                 }}
@@ -515,18 +562,18 @@ function BirthdayWish() {
                 )}
               </div>
             )
-          ))}
+          })}
         </>
       )}
 
       <div className="birthday-header">
-        <h1>Birthday Wishes</h1>
-        <p>Send beautiful birthday wishes to your friends and family</p>
+        <h1>Happy Birthday Jaan</h1>
+        <p>Lets look at our beautifull story which we have had so far ....</p>
         <div className="birthday-decoration">
           <span>🎂</span>
           <span>🎁</span>
           <span>🎉</span>
-          <span>🎈</span>
+          <span>💗</span>
         </div>
       </div>
 
@@ -545,15 +592,20 @@ function BirthdayWish() {
               className={`birthday-card card-theme-${card.theme}`}
             >
               <div className="card-image">
-                <img src={card.image} alt="Birthday" />
+                <img 
+                  src={card.image} 
+                  alt={card.header} 
+                  loading="lazy"
+                  className="responsive-image"
+                />
               </div>
               <div className="card-content">
                 <div className="confetti">
-                  <span>🎊</span>
+                  <span>💗</span>
                   <span>✨</span>
-                  <span>🎉</span>
+                  <span>❤️</span>
                 </div>
-                <h3>Happy Birthday!</h3>
+                <h3>{card.header}</h3>
                 <p className="card-message">{card.message}</p>
                 <p className="card-sender">- {card.sender}</p>
               </div>
@@ -563,9 +615,8 @@ function BirthdayWish() {
       </div>
 
       <div className="create-wish-section">
-        <h2>Create Your Own Birthday Wish</h2>
-        <p>Customize a special birthday message for someone you care about</p>
-        <button className="create-wish-btn">Create Custom Wish</button>
+        <h2>Happy Birthdday Once Again !!!</h2>
+        <p>Will be making more such memories in the upcoming years 🫂❤️</p>
       </div>
     </div>
   );

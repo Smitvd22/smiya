@@ -6,7 +6,7 @@ function Home() {
     <div className="home-container">
       <div className="hero-section">
         <h1>Welcome to Smiya</h1>
-        <p>Connect with friends, share moments, and stay in touch.</p>
+        <p>An app just made for smiya to talk.</p>
         
         <div className="auth-buttons">
           <Link to="/login" className="btn btn-primary">
@@ -18,10 +18,10 @@ function Home() {
         </div>
         
         <div className="birthday-wish-banner">
-          <span className="birthday-icons">🎂 🎉 🎁</span>
-          <h3>Send Birthday Wishes to Your Loved Ones!</h3>
+          <span className="birthday-icons">🎂 ❤️ 💗 🎁</span>
+          <h3>HAPPIEST BIRTHDAY AARU JAAN!!!</h3>
           <Link to="/birthday" className="btn btn-birthday">
-            Create Birthday Wish
+            Proceed
           </Link>
         </div>
       </div>
@@ -36,15 +36,6 @@ function Home() {
           <div className="feature-card">
             <h3>Video Calls</h3>
             <p>Face-to-face conversations no matter the distance</p>
-          </div>
-          <div className="feature-card">
-            <h3>Secure Platform</h3>
-            <p>Your privacy is our priority</p>
-          </div>
-          <div className="feature-card">
-            <h3>Birthday Wishes</h3>
-            <p>Send beautiful birthday cards to friends and family</p>
-            <Link to="/birthday" className="feature-link">Try it now →</Link>
           </div>
         </div>
       </div>
