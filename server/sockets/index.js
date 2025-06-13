@@ -21,6 +21,32 @@ export const setupSocketIO = (io) => {
       socket.join(roomId);
       console.log(`Socket ${socket.id} joined room: ${roomId}`);
     });
+
+    // ====== VIDEO ROOM FUNCTIONALITY ======
+    
+    // Join a video room
+    socket.on('join-videoroom', (roomId, peerId) => {
+      socket.join(`videoroom-${roomId}`);
+      console.log(`Socket ${socket.id} joined video room: ${roomId} with peer ID: ${peerId}`);
+      // Notify others in the room
+      socket.to(`videoroom-${roomId}`).emit('user-joined-videoroom', peerId);
+      
+      // Store roomId and peerId for disconnection handling
+      socket.videoRoomId = roomId;
+      socket.peerId = peerId;
+    });
+    
+    // Leave a video room
+    socket.on('leave-videoroom', (roomId, peerId) => {
+      socket.leave(`videoroom-${roomId}`);
+      console.log(`Socket ${socket.id} left video room: ${roomId}`);
+      // Notify others in the room
+      socket.to(`videoroom-${roomId}`).emit('user-left-videoroom', peerId);
+      
+      // Clean up stored data
+      delete socket.videoRoomId;
+      delete socket.peerId;
+    });
     
     // ====== MESSAGING FUNCTIONALITY ======
     
@@ -167,6 +193,11 @@ export const setupSocketIO = (io) => {
     // Handle disconnection
     socket.on('disconnect', () => {
       console.log('User disconnected:', socket.id);
+      
+      // Notify video room peers if needed
+      if (socket.videoRoomId && socket.peerId) {
+        socket.to(`videoroom-${socket.videoRoomId}`).emit('user-left-videoroom', socket.peerId);
+      }
     });
 
     // ====== PING FUNCTIONALITY ======
@@ -187,15 +218,15 @@ export const setupSocketIO = (io) => {
 export const initializeSocketIO = (server, app) => {
   const io = new Server(server, {
     cors: {
-      origin: process.env.CLIENT_URL || "*",
-      methods: ["GET", "POST"]
+      origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
+      methods: ['GET', 'POST']
     }
   });
   
-  // Make io available to the Express app
+  // Store io instance in app for use in other parts of the application
   app.set('io', io);
   
-  // Set up socket.io with our handlers
+  // Setup socket handlers
   setupSocketIO(io);
   
   return io;

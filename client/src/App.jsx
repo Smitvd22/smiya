@@ -9,6 +9,8 @@ import VideoCall from './pages/VideoCall';
 import BirthdayWish from './pages/BirthdayWish';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
+import VideoRoom from './pages/VideoRoom';
+import CreateVideoRoom from './pages/CreateVideoRoom';
 import { getCurrentUser } from './services/authService';
 import { CallProvider } from './contexts/CallContext';
 import './utils/processPolyfill';
@@ -21,8 +23,8 @@ function App() {
     const user = getCurrentUser();
     return !!user && !!user.token;
   };
-  
-  return (  
+
+  return (
     <Router
       future={{
         v7_startTransition: true,
@@ -33,9 +35,9 @@ function App() {
         <div className="App">
           <div className="floating-hearts">
             {[...Array(15)].map((_, i) => (
-              <div 
-                key={`heart-${i}`} 
-                className="heart" 
+              <div
+                key={`heart-${i}`}
+                className="heart"
                 style={{
                   left: `${Math.random() * 100}%`,
                   animationDuration: `${15 + Math.random() * 10}s`,
@@ -49,42 +51,46 @@ function App() {
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<Home />} />
-            <Route 
-              path="/login" 
-              element={isAuthenticated() ? <Navigate to="/friends" /> : <Login />} 
+            <Route
+              path="/login"
+              element={isAuthenticated() ? <Navigate to="/friends" /> : <Login />}
             />
-            <Route 
-              path="/register" 
-              element={isAuthenticated() ? <Navigate to="/friends" /> : <Register />} 
+            <Route
+              path="/register"
+              element={isAuthenticated() ? <Navigate to="/friends" /> : <Register />}
             />
             <Route path="/birthday" element={<BirthdayWish />} />
-            
+
             {/* Protected routes */}
-            <Route 
-              path="/friends" 
+            <Route
+              path="/friends"
               element={
                 <ProtectedRoute>
                   <Friends />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/chat/:friendId" 
+            <Route
+              path="/chat/:friendId"
               element={
                 <ProtectedRoute>
                   <Chat />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/videocall" 
+
+            <Route path="/videorooms" element={<CreateVideoRoom />} />
+            <Route path="/videoroom/:roomId" element={<VideoRoom />} />
+
+            <Route
+              path="/videocall"
               element={
                 <ProtectedRoute>
                   <VideoCall />
                 </ProtectedRoute>
-              } 
+              }
             />
-            
+
             {/* Redirect all other routes */}
             <Route path="*" element={isAuthenticated() ? <Navigate to="/friends" /> : <Navigate to="/login" />} />
           </Routes>

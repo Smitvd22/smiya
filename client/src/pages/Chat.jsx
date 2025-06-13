@@ -439,9 +439,14 @@ function Chat() {
             'Friend'
           ) : 'Loading...'}
         </h2>
-        <button className="video-call-btn" onClick={initiateCall}>
-          Video Call
-        </button>
+        <div className="call-buttons">
+          <button className="video-call-btn" onClick={initiateCall}>
+            Video Call
+          </button>
+          <button className="video-room-btn" onClick={() => navigate('/videorooms')}>
+            Group Video
+          </button>
+        </div>
       </div>
       
       {error && <div className="error-message">{error}</div>}

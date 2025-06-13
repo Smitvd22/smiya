@@ -1,12 +1,15 @@
 import express from 'express';
 import cors from 'cors';
 import { pool } from './config/db.js';
-import { initializeSocketIO } from './sockets/index.js'; // Updated import
+import { initializeSocketIO } from './sockets/index.js';
 import { initializeDatabase } from './config/schema.js';
 import authRoutes from './routes/authRoutes.js';
 import friendRoutes from './routes/friendRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
+// Add PeerJS server
+import { ExpressPeerServer } from 'peer';
+import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -29,12 +32,19 @@ app.use('/api/friends', friendRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes);
 
+// Status endpoint
 app.get('/api/status', (req, res) => {
   res.json({
     status: 'online',
     environment: NODE_ENV,
     timestamp: new Date().toISOString()
   });
+});
+
+// Room creation endpoint
+app.get('/api/videoroom/create', (req, res) => {
+  const roomId = uuidv4();
+  res.json({ roomId });
 });
 
 app.get('/', (req, res) => {
@@ -62,3 +72,20 @@ const server = app.listen(PORT, () => {
 
 // Initialize Socket.IO with unified handlers
 initializeSocketIO(server, app);
+
+// Initialize PeerJS Server
+const peerServer = ExpressPeerServer(server, {
+  debug: NODE_ENV === 'development',
+  path: '/peerjs'
+});
+
+app.use('/peerjs', peerServer);
+
+// PeerJS connection event handlers
+peerServer.on('connection', (client) => {
+  console.log(`PeerJS client connected: ${client.getId()}`);
+});
+
+peerServer.on('disconnect', (client) => {
+  console.log(`PeerJS client disconnected: ${client.getId()}`);
+});
