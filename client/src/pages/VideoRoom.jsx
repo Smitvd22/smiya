@@ -95,7 +95,7 @@ const VideoRoom = () => {
         // Initialize peer connection
         const peer = new Peer(undefined, {
           host: PEER_SERVER,
-          port: PEER_PORT,
+          port: process.env.NODE_ENV === 'production' ? 443 : 5000,
           path: PEER_PATH,
           secure: process.env.NODE_ENV === 'production'
         });
