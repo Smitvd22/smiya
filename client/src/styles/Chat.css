@@ -19,12 +19,10 @@
 .chat-header {
   display: flex;
   align-items: center;
-  padding: 15px;
-  border-bottom: 1px solid #eaeaea;
-  background: linear-gradient(to right, var(--primary-cyan), var(--primary-pink));
-  color: white;
-  border-top-left-radius: 8px;
-  border-top-right-radius: 8px;
+  justify-content: space-between;
+  padding: 1rem;
+  border-bottom: 1px solid #e1e5e9;
+  background: white;
 }
 
 .chat-header h2 {
@@ -41,6 +39,41 @@
   cursor: pointer;
   color: #2196f3;
   padding: 5px 10px;
+}
+
+.chat-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.video-call-btn, .share-call-btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.video-call-btn {
+  background: #4CAF50;
+  color: white;
+}
+
+.video-call-btn:hover {
+  background: #45a049;
+  transform: translateY(-1px);
+}
+
+.share-call-btn {
+  background: #2196F3;
+  color: white;
+}
+
+.share-call-btn:hover {
+  background: #1976D2;
+  transform: translateY(-1px);
 }
 
 /* Ensure messages container has proper scroll containment */
@@ -91,6 +124,13 @@
   color: #757575;
   text-align: right;
   margin-top: 4px;
+}
+
+/* Message type styling */
+.message[data-message-type="video_call_link"] {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px;
 }
 
 /* Keep the message form at the bottom */

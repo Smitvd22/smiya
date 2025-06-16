@@ -21,32 +21,6 @@ export const setupSocketIO = (io) => {
       socket.join(roomId);
       console.log(`Socket ${socket.id} joined room: ${roomId}`);
     });
-
-    // ====== VIDEO ROOM FUNCTIONALITY ======
-    
-    // Join a video room
-    socket.on('join-videoroom', (roomId, peerId) => {
-      socket.join(`videoroom-${roomId}`);
-      console.log(`Socket ${socket.id} joined video room: ${roomId} with peer ID: ${peerId}`);
-      // Notify others in the room
-      socket.to(`videoroom-${roomId}`).emit('user-joined-videoroom', peerId);
-      
-      // Store roomId and peerId for disconnection handling
-      socket.videoRoomId = roomId;
-      socket.peerId = peerId;
-    });
-    
-    // Leave a video room
-    socket.on('leave-videoroom', (roomId, peerId) => {
-      socket.leave(`videoroom-${roomId}`);
-      console.log(`Socket ${socket.id} left video room: ${roomId}`);
-      // Notify others in the room
-      socket.to(`videoroom-${roomId}`).emit('user-left-videoroom', peerId);
-      
-      // Clean up stored data
-      delete socket.videoRoomId;
-      delete socket.peerId;
-    });
     
     // ====== MESSAGING FUNCTIONALITY ======
     
@@ -179,6 +153,53 @@ export const setupSocketIO = (io) => {
       }
     });
     
+    // ====== RANDOM VIDEO CALLING FUNCTIONALITY ======
+    
+    // Handle joining random video call room
+    socket.on('join-random-videocall', (roomId, peerId) => {
+      console.log(`User ${socket.id} joining random video call room: ${roomId} with peer ID: ${peerId}`);
+      
+      // Store the room and peer info
+      socket.randomVideoRoomId = roomId;
+      socket.randomPeerId = peerId;
+      socket.userId = socket.userId || socket.id; // Fallback to socket ID if no user ID
+      
+      // Join the room
+      socket.join(`random-videocall-${roomId}`);
+      
+      // Notify others in the room
+      socket.to(`random-videocall-${roomId}`).emit('user-joined-random-videocall', peerId);
+      
+      console.log(`User ${socket.id} joined random video call room: random-videocall-${roomId}`);
+    });
+    
+    // Handle leaving random video call room
+    socket.on('leave-random-videocall', (roomId, peerId) => {
+      console.log(`User ${socket.id} leaving random video call room: ${roomId}`);
+      
+      if (socket.randomVideoRoomId) {
+        // Notify others in the room
+        socket.to(`random-videocall-${socket.randomVideoRoomId}`).emit('user-left-random-videocall', socket.randomPeerId);
+        
+        // Leave the room
+        socket.leave(`random-videocall-${socket.randomVideoRoomId}`);
+        
+        // Clear room info
+        socket.randomVideoRoomId = null;
+        socket.randomPeerId = null;
+      }
+    });
+    
+    // Handle getting room participants
+    socket.on('get-room-participants', (roomId, callback) => {
+      const room = io.sockets.adapter.rooms.get(`random-videocall-${roomId}`);
+      const participantCount = room ? room.size : 0;
+      
+      if (typeof callback === 'function') {
+        callback({ participantCount });
+      }
+    });
+
     // ====== USER PRESENCE ======
     
     // Handle user online status (optional enhancement)
@@ -197,6 +218,16 @@ export const setupSocketIO = (io) => {
       // Notify video room peers if needed
       if (socket.videoRoomId && socket.peerId) {
         socket.to(`videoroom-${socket.videoRoomId}`).emit('user-left-videoroom', socket.peerId);
+      }
+      
+      // Notify random video call peers if needed - IMPROVED
+      if (socket.randomVideoRoomId && socket.randomPeerId) {
+        console.log(`User disconnected from random video call: ${socket.randomVideoRoomId}`);
+        socket.to(`random-videocall-${socket.randomVideoRoomId}`).emit('user-left-random-videocall', socket.randomPeerId);
+        
+        // Clean up the room data
+        socket.randomVideoRoomId = null;
+        socket.randomPeerId = null;
       }
     });
 

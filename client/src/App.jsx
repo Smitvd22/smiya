@@ -5,12 +5,10 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Friends from './pages/Friends';
 import Chat from './pages/Chat';
-import VideoCall from './pages/VideoCall';
+import RandomVideoCall from './pages/RandomVideoCall';
 import BirthdayWish from './pages/BirthdayWish';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
-import VideoRoom from './pages/VideoRoom';
-import CreateVideoRoom from './pages/CreateVideoRoom';
 import { getCurrentUser } from './services/authService';
 import { CallProvider } from './contexts/CallContext';
 import './utils/processPolyfill';
@@ -78,15 +76,11 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
-            <Route path="/videorooms" element={<CreateVideoRoom />} />
-            <Route path="/videoroom/:roomId" element={<VideoRoom />} />
-
             <Route
-              path="/videocall"
+              path="/videocall/:roomId"
               element={
                 <ProtectedRoute>
-                  <VideoCall />
+                  <RandomVideoCall />
                 </ProtectedRoute>
               }
             />

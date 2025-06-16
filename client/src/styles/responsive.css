@@ -258,28 +258,6 @@ a, button, .nav-item, .dropdown-item, input,
   margin-bottom: clamp(10px, 3vw, 15px);
 }
 
-/* Video call improvements */
-.video-call-container video {
-  object-fit: cover;
-}
-
-.my-video-container {
-  width: clamp(80px, 25vw, 160px);
-  height: clamp(60px, 15vw, 120px);
-  right: clamp(8px, 3vw, 16px);
-  bottom: clamp(80px, 15vh, 120px);
-}
-
-.call-controls {
-  bottom: clamp(16px, 4vh, 24px);
-  gap: clamp(8px, 2vw, 16px);
-}
-
-.toggle-audio, .toggle-video, .end-call {
-  width: clamp(42px, 10vw, 60px);
-  height: clamp(42px, 10vw, 60px);
-}
-
 /* Enhanced popups with animations */
 .birthday-popup {
   max-width: clamp(250px, 80vw, 400px);
