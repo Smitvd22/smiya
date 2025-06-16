@@ -53,6 +53,18 @@ const RandomVideoCall = () => {
   const addPeerVideo = (peerId, stream) => {
     if (!isComponentMounted.current) return;
     
+    console.log(`Adding peer video for ${peerId}:`, {
+      streamId: stream.id,
+      audioTracks: stream.getAudioTracks().length,
+      videoTracks: stream.getVideoTracks().length,
+      streamActive: stream.active
+    });
+    
+    // Check if tracks are enabled
+    stream.getTracks().forEach(track => {
+      console.log(`Track ${track.kind}: enabled=${track.enabled}, readyState=${track.readyState}`);
+    });
+    
     setPeers(prevPeers => ({
       ...prevPeers,
       [peerId]: stream
@@ -84,6 +96,7 @@ const RandomVideoCall = () => {
     // FIXED: Copy refs to variables inside the effect
     const currentPeersRef = peersRef.current;
     const currentSocket = socket;
+    const currentVideoElement = myVideo.current; // Add this line
     
     const initializeRoom = async () => {
       try {
@@ -105,8 +118,24 @@ const RandomVideoCall = () => {
         } catch (err) {
           console.warn('Media access denied, continuing without media:', err);
           setHasMediaPermission(false);
-          // Create empty stream for users without media permission
-          stream = new MediaStream();
+          // FIXED: Create a proper empty stream with silent audio track
+          const audioContext = new AudioContext();
+          const oscillator = audioContext.createOscillator();
+          const destination = audioContext.createMediaStreamDestination();
+          oscillator.connect(destination);
+          oscillator.start();
+          stream = destination.stream;
+          
+          // Add a black video track if needed
+          const canvas = document.createElement('canvas');
+          canvas.width = 640;
+          canvas.height = 480;
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#000000';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          const videoStream = canvas.captureStream(30);
+          stream.addTrack(videoStream.getVideoTracks()[0]);
+          
           myStream.current = stream;
         }
         
@@ -153,7 +182,8 @@ const RandomVideoCall = () => {
           if (!isComponentMounted.current) return;
           
           console.log('Receiving call from:', call.peer);
-          call.answer(stream);
+          // FIXED: Pass the current stream when answering
+          call.answer(myStream.current);
           const peerId = call.peer;
           
           call.on('stream', (userVideoStream) => {
@@ -201,7 +231,7 @@ const RandomVideoCall = () => {
           }
           
           console.log('User joined, calling:', userId);
-          const call = peerInstance.current.call(userId, stream);
+          const call = peerInstance.current.call(userId, myStream.current);
           
           call.on('stream', (userVideoStream) => {
             if (isComponentMounted.current) {
@@ -227,6 +257,15 @@ const RandomVideoCall = () => {
           currentPeersRef[userId] = call;
         };
         
+        const handleExistingUsers = (existingUsers) => {
+          console.log('Existing users in room:', existingUsers);
+          existingUsers.forEach(userId => {
+            if (userId !== myPeerId) {
+              handleUserJoined(userId);
+            }
+          });
+        };
+        
         const handleUserLeft = (userId) => {
           if (!isComponentMounted.current) return;
           
@@ -239,11 +278,13 @@ const RandomVideoCall = () => {
         
         // Add socket listeners
         currentSocket.on('user-joined-random-videocall', handleUserJoined);
+        currentSocket.on('existing-users', handleExistingUsers);
         currentSocket.on('user-left-random-videocall', handleUserLeft);
         
         // Store cleanup functions
         peer._cleanup = () => {
           currentSocket.off('user-joined-random-videocall', handleUserJoined);
+          currentSocket.off('existing-users', handleExistingUsers);
           currentSocket.off('user-left-random-videocall', handleUserLeft);
         };
         
@@ -264,7 +305,6 @@ const RandomVideoCall = () => {
     return () => {
       console.log('Cleaning up RandomVideoCall component');
       
-      // FIXED: Use the copied references from the beginning of the effect
       // Close all peer connections using the copied reference
       Object.values(currentPeersRef).forEach(call => {
         if (call && call.close) {
@@ -276,15 +316,26 @@ const RandomVideoCall = () => {
         }
       });
       
-      // Stop media stream
+      // Stop media stream and all tracks properly
       if (myStream.current) {
         try {
-          myStream.current.getTracks().forEach(track => track.stop());
+          myStream.current.getTracks().forEach(track => {
+            if (track.readyState === 'live') {
+              track.stop();
+              console.log(`Stopped ${track.kind} track`);
+            }
+          });
+          myStream.current = null;
         } catch (err) {
           console.warn('Error stopping media tracks:', err);
         }
       }
       
+      // Clear video element source using captured reference
+      if (currentVideoElement) {
+        currentVideoElement.srcObject = null;
+      }
+
       // Clean up peer
       if (peerInstance.current) {
         try {
@@ -314,7 +365,40 @@ const RandomVideoCall = () => {
         }
       }
     };
-  }, [roomId, socket, isInitialized]); // Remove myPeerId dependency
+  }, [roomId, socket, isInitialized, navigate, myPeerId]); // Add navigate, remove myPeerId as it's handled via ref
+  
+  // Add effect to handle page unload/navigation
+  useEffect(() => {
+    // Copy the ref value to a variable inside the effect
+    const currentVideoElement = myVideo.current;
+    
+    const handleBeforeUnload = () => {
+      // Stop all media tracks when user navigates away
+      if (myStream.current) {
+        myStream.current.getTracks().forEach(track => {
+          if (track.readyState === 'live') {
+            track.stop();
+          }
+        });
+      }
+      
+      // Clear video element using the captured reference
+      if (currentVideoElement) {
+        currentVideoElement.srcObject = null;
+      }
+      
+      navigate(-1);
+    };
+
+    // Add event listener for page unload
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      handleBeforeUnload(); // Also call when component unmounts
+    };
+  }, [navigate]);
   
   const toggleAudio = () => {
     if (myStream.current) {
@@ -330,13 +414,87 @@ const RandomVideoCall = () => {
     if (myStream.current) {
       const videoTrack = myStream.current.getVideoTracks()[0];
       if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setIsVideoOff(!videoTrack.enabled);
+        if (!isVideoOff) {
+          // Stop the video track completely when turning off camera
+          videoTrack.stop();
+          setIsVideoOff(true);
+          
+          // Remove the video track from the stream
+          myStream.current.removeTrack(videoTrack);
+          
+          // Update peer connections to remove video track
+          Object.values(peersRef.current).forEach(call => {
+            if (call && call.peerConnection) {
+              const sender = call.peerConnection.getSenders().find(s => 
+                s.track && s.track.kind === 'video'
+              );
+              if (sender) {
+                sender.replaceTrack(null);
+              }
+            }
+          });
+        } else {
+          // Re-enable camera when turning video back on
+          restartVideoTrack();
+        }
       }
     }
   };
   
+  // Add new function to restart video track
+  const restartVideoTrack = async () => {
+    try {
+      const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const videoTrack = videoStream.getVideoTracks()[0];
+      
+      if (videoTrack && myStream.current) {
+        // Add the new video track to the stream
+        myStream.current.addTrack(videoTrack);
+        
+        // Update the video element
+        if (myVideo.current) {
+          myVideo.current.srcObject = myStream.current;
+        }
+        
+        // Update peer connections with new video track
+        Object.values(peersRef.current).forEach(call => {
+          if (call && call.peerConnection) {
+            const sender = call.peerConnection.getSenders().find(s => 
+              s.track && s.track.kind === 'video'
+            );
+            if (sender) {
+              sender.replaceTrack(videoTrack);
+            } else {
+              // Add new sender if none exists
+              call.peerConnection.addTrack(videoTrack, myStream.current);
+            }
+          }
+        });
+        
+        setIsVideoOff(false);
+      }
+    } catch (err) {
+      console.error('Failed to restart video track:', err);
+      alert('Could not access camera. Please check permissions.');
+    }
+  };
+  
   const leaveCall = () => {
+    // Stop all media tracks before leaving
+    if (myStream.current) {
+      myStream.current.getTracks().forEach(track => {
+        if (track.readyState === 'live') {
+          track.stop();
+          console.log(`Stopped ${track.kind} track on leave`);
+        }
+      });
+    }
+    
+    // Clear video element
+    if (myVideo.current) {
+      myVideo.current.srcObject = null;
+    }
+    
     navigate(-1);
   };
   

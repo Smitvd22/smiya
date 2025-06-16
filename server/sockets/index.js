@@ -162,15 +162,30 @@ export const setupSocketIO = (io) => {
       // Store the room and peer info
       socket.randomVideoRoomId = roomId;
       socket.randomPeerId = peerId;
-      socket.userId = socket.userId || socket.id; // Fallback to socket ID if no user ID
+      socket.userId = socket.userId || socket.id;
+      
+      // Get existing users in the room before joining
+      const room = io.sockets.adapter.rooms.get(`random-videocall-${roomId}`);
+      const existingUsers = [];
+      if (room) {
+        room.forEach(socketId => {
+          const existingSocket = io.sockets.sockets.get(socketId);
+          if (existingSocket && existingSocket.randomPeerId && existingSocket.randomPeerId !== peerId) {
+            existingUsers.push(existingSocket.randomPeerId);
+          }
+        });
+      }
       
       // Join the room
       socket.join(`random-videocall-${roomId}`);
       
-      // Notify others in the room
+      // Send existing users to the new joiner
+      socket.emit('existing-users', existingUsers);
+      
+      // Notify others in the room about the new user
       socket.to(`random-videocall-${roomId}`).emit('user-joined-random-videocall', peerId);
       
-      console.log(`User ${socket.id} joined random video call room: random-videocall-${roomId}`);
+      console.log(`User ${socket.id} joined random video call room: random-videocall-${roomId}, existing users: ${existingUsers.length}`);
     });
     
     // Handle leaving random video call room
