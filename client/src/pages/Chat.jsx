@@ -416,7 +416,7 @@ function Chat() {
   //   return parts.length > 1 ? parts[parts.length - 1].split('?')[0] : '';
   // };
 
-  // Add this new function for random video call
+  // Update navigation to use existing RandomVideoCall
   const startRandomVideoCall = async () => {
     try {
       const currentUser = getCurrentUser();
@@ -428,8 +428,8 @@ function Chat() {
       // Generate a random room ID
       const roomId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
       
-      // Navigate to the video call room
-      navigate(`/videocall/${roomId}`, {
+      // Navigate to random video call (remove /videocall reference)
+      navigate(`/random-videocall/${roomId}`, {
         state: {
           isHost: true,
           friendInfo: friendInfo,
@@ -437,7 +437,7 @@ function Chat() {
         }
       });
     } catch (err) {
-      console.error('Error starting video call:', err);
+      console.error('Error starting random video call:', err);
       setError('Failed to start video call');
     }
   };

@@ -65,8 +65,11 @@ export function CallProvider({ children }) {
     console.log('CallContext: Accepting call', callData);
     setIncomingCall(null);
 
-    // Ensure we have a complete caller info object with proper signals
-    const completeCallerInfo = {
+    // Generate random room for the call
+    const roomId = Math.random().toString(36).substring(2, 15);
+    
+    // Store caller info in context
+    setCallerInfo({
       signal: callData.signal,
       id: callData.from,
       username: callData.fromUsername,
@@ -74,15 +77,21 @@ export function CallProvider({ children }) {
       profileImage: callData.profileImage || null,
       autoAccept: true,
       signalType: callData.signalType || 'offer'
-    };
+    });
     
-    // Store caller info in context for components that mount later
-    setCallerInfo(completeCallerInfo);
-    
-    // Navigate to video call with same info
-    navigate('/videocall', {
+    // Navigate to random video call instead of /videocall
+    navigate(`/random-videocall/${roomId}`, {
       state: {
-        callerInfo: completeCallerInfo,
+        callerInfo: {
+          signal: callData.signal,
+          id: callData.from,
+          username: callData.fromUsername,
+          fromUsername: callData.fromUsername,
+          profileImage: callData.profileImage || null,
+          autoAccept: true,
+          signalType: callData.signalType || 'offer'
+        },
+        isHost: false
       },
       replace: true,
     });

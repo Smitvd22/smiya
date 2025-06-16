@@ -75,11 +75,8 @@ const RandomVideoCall = () => {
   
   // Main initialization effect - FIXED to prevent multiple initializations
   useEffect(() => {
-    if (!roomId || !socket || isInitialized) {
-      return;
-    }
-
-    // Prevent multiple initializations
+    if (!roomId || !socket || isInitialized) return;
+    
     setIsInitialized(true);
     
     console.log(`Initializing random video call for room: ${roomId}`);
@@ -122,11 +119,10 @@ const RandomVideoCall = () => {
         
         // Initialize peer connection with stable configuration
         const peer = new Peer(undefined, {
-          host: process.env.NODE_ENV === 'production' ? window.location.hostname : 'localhost',
-          port: process.env.NODE_ENV === 'production' ? 443 : 9000,
+          host: process.env.REACT_APP_PEER_HOST || 'localhost',
+          port: process.env.REACT_APP_PEER_PORT || 9000,
           path: '/peerjs',
           secure: process.env.NODE_ENV === 'production',
-          debug: 2,
           config: {
             iceServers: [
               { urls: 'stun:stun.l.google.com:19302' },
@@ -318,7 +314,7 @@ const RandomVideoCall = () => {
         }
       }
     };
-  }, [roomId, socket, isInitialized]); // FIXED: Removed myPeerId from dependencies
+  }, [roomId, socket, isInitialized]); // Remove myPeerId dependency
   
   const toggleAudio = () => {
     if (myStream.current) {

@@ -11,7 +11,6 @@ import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import { getCurrentUser } from './services/authService';
 import { CallProvider } from './contexts/CallContext';
-import './utils/processPolyfill';
 import './App.css';
 import './styles/LoveTheme.css';
 
@@ -77,7 +76,7 @@ function App() {
               }
             />
             <Route
-              path="/videocall/:roomId"
+              path="/random-videocall/:roomId"
               element={
                 <ProtectedRoute>
                   <RandomVideoCall />

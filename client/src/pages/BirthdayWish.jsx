@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import '../styles/BirthdayWish.css';
-import '../styles/BirthdayWishResponsive.css'; // Add this new import
 
 function BirthdayWish() {
   const cards = useRef([]);
