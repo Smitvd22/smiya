@@ -7,8 +7,6 @@ import authRoutes from './routes/authRoutes.js';
 import friendRoutes from './routes/friendRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
-// Add PeerJS server
-import { PeerServer } from 'peer';
 import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
@@ -72,21 +70,3 @@ const server = app.listen(PORT, () => {
 
 // Initialize Socket.IO with unified handlers
 initializeSocketIO(server, app);
-
-// Create PeerJS server
-const peerServer = PeerServer({ 
-  port: process.env.PEER_PORT || 9000, 
-  path: '/peerjs',
-  allow_discovery: true
-});
-
-console.log(`PeerJS server running on port ${process.env.PEER_PORT || 9000}`);
-
-// PeerJS connection event handlers
-peerServer.on('connection', (client) => {
-  console.log(`PeerJS client connected: ${client.getId()}`);
-});
-
-peerServer.on('disconnect', (client) => {
-  console.log(`PeerJS client disconnected: ${client.getId()}`);
-});

@@ -409,84 +409,6 @@ function Chat() {
     );
   };
 
-  // Helper function for Chat.jsx
-  // const getFormatFromUrl = (url) => {
-  //   if (!url) return '';
-  //   const parts = url.split('.');
-  //   return parts.length > 1 ? parts[parts.length - 1].split('?')[0] : '';
-  // };
-
-  // Update navigation to use existing RandomVideoCall
-  const startRandomVideoCall = async () => {
-    try {
-      const currentUser = getCurrentUser();
-      if (!currentUser || !currentUser.token) {
-        setError('You need to be logged in');
-        return;
-      }
-
-      // Generate a random room ID
-      const roomId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-      
-      // Navigate to random video call (remove /videocall reference)
-      navigate(`/random-videocall/${roomId}`, {
-        state: {
-          isHost: true,
-          friendInfo: friendInfo,
-          roomId: roomId
-        }
-      });
-    } catch (err) {
-      console.error('Error starting random video call:', err);
-      setError('Failed to start video call');
-    }
-  };
-
-  // Add this function to share the video call link
-  const shareVideoCallLink = async () => {
-    try {
-      const currentUser = getCurrentUser();
-      if (!currentUser || !currentUser.token) {
-        setError('You need to be logged in');
-        return;
-      }
-
-      const roomId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-      const videoCallLink = `${window.location.origin}/videocall/${roomId}`;
-      
-      // Send the link as a message
-      const linkMessage = {
-        content: `Join my video call: ${videoCallLink}`,
-        receiverId: friendId,
-        senderId: currentUser.id,
-        messageType: 'video_call_link'
-      };
-      
-      await axios.post(`${API_URL}/messages`, linkMessage, {
-        headers: { Authorization: `Bearer ${currentUser.token}` }
-      });
-      
-      // Clear input and scroll to bottom
-      setTimeout(() => {
-        if (messagesContainerRef.current) {
-          messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-        }
-      }, 300);
-      
-      // Also navigate to the call
-      navigate(`/videocall/${roomId}`, {
-        state: {
-          isHost: true,
-          friendInfo: friendInfo,
-          roomId: roomId
-        }
-      });
-    } catch (err) {
-      console.error('Error sharing video call link:', err);
-      setError('Failed to share video call link');
-    }
-  };
-
   return (
     <div className="chat-container">
       <div className="chat-header">
@@ -500,23 +422,7 @@ function Chat() {
             'Friend'
           ) : 'Loading...'}
         </h2>
-        {/* Add video call buttons */}
-        <div className="chat-actions">
-          <button 
-            className="video-call-btn" 
-            onClick={startRandomVideoCall}
-            title="Start Video Call"
-          >
-            📹 Video Call
-          </button>
-          <button 
-            className="share-call-btn" 
-            onClick={shareVideoCallLink}
-            title="Share Video Call Link"
-          >
-            🔗 Share Call
-          </button>
-        </div>
+        
       </div>
       
       {error && <div className="error-message">{error}</div>}

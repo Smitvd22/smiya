@@ -1,11 +1,9 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Friends from './pages/Friends';
 import Chat from './pages/Chat';
-import RandomVideoCall from './pages/RandomVideoCall';
 import BirthdayWish from './pages/BirthdayWish';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -75,15 +73,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/random-videocall/:roomId"
-              element={
-                <ProtectedRoute>
-                  <RandomVideoCall />
-                </ProtectedRoute>
-              }
-            />
-
             {/* Redirect all other routes */}
             <Route path="*" element={isAuthenticated() ? <Navigate to="/friends" /> : <Navigate to="/login" />} />
           </Routes>
