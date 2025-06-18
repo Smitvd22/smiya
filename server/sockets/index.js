@@ -59,9 +59,95 @@ export const setupSocketIO = (io) => {
       });
     });
     
-    // Handle disconnection
-    socket.on('disconnect', () => {
-      console.log('User disconnected:', socket.id);
+    // Join a video call - FIXED: Better handling to prevent early leaves
+    socket.on('join-video-call', (callId, peerId) => {
+      try {
+        console.log(`Socket ${socket.id} attempting to join video call ${callId} with peer ID ${peerId}`);
+        
+        // Store the peer ID on the socket BEFORE joining
+        socket.peerId = peerId;
+        socket.currentCallId = callId;
+        
+        // Check if already in room
+        const currentRooms = Array.from(socket.rooms);
+        if (currentRooms.includes(callId)) {
+          console.log(`Socket ${socket.id} already in room ${callId}, updating peer ID`);
+          // Just update the peer ID and notify
+          socket.to(callId).emit('user-joined-video-call', peerId);
+          return;
+        }
+        
+        // Join the room
+        socket.join(callId);
+        console.log(`Socket ${socket.id} successfully joined video call ${callId}`);
+        
+        // Get room info
+        const room = io.sockets.adapter.rooms.get(callId);
+        const roomSize = room ? room.size : 0;
+        
+        console.log(`Room ${callId} now has ${roomSize} participants`);
+        
+        // Send confirmation to the joiner
+        socket.emit('video-call-joined', { 
+          callId, 
+          peerId, 
+          roomSize,
+          success: true 
+        });
+        
+        // If there are other participants, notify them and send existing participants to new joiner
+        if (roomSize > 1) {
+          // Notify existing users about new participant
+          socket.to(callId).emit('user-joined-video-call', peerId);
+          console.log(`Notified ${roomSize - 1} users about new participant ${peerId}`);
+          
+          // Send existing participants to the new joiner
+          const existingPeers = [];
+          room.forEach(socketId => {
+            const existingSocket = io.sockets.sockets.get(socketId);
+            if (existingSocket && existingSocket.peerId && existingSocket.peerId !== peerId) {
+              existingPeers.push(existingSocket.peerId);
+            }
+          });
+          
+          if (existingPeers.length > 0) {
+            // Small delay to ensure the peer is ready
+            setTimeout(() => {
+              socket.emit('existing-participants', existingPeers);
+            }, 500);
+          }
+        }
+      } catch (error) {
+        console.error(`Error joining video call ${callId}:`, error);
+        socket.emit('video-call-error', { error: 'Failed to join call' });
+      }
+    });
+
+    // FIXED: Better leave handling - only leave if actually in the call
+    socket.on('leave-video-call', (callId) => {
+      if (socket.currentCallId === callId) {
+        console.log(`Socket ${socket.id} leaving video call ${callId}`);
+        socket.to(callId).emit('user-left-video-call', socket.peerId || socket.id);
+        socket.leave(callId);
+        socket.currentCallId = null;
+        socket.peerId = null;
+      }
+    });
+
+    // ====== RANDOM VIDEO CALL FUNCTIONALITY ======
+    
+    // Join random video call
+    socket.on('join-random-videocall', (roomId, peerId) => {
+      console.log(`Socket ${socket.id} joining random video call ${roomId} with peer ID ${peerId}`);
+      socket.join(roomId);
+      socket.to(roomId).emit('user-joined-random-videocall', peerId);
+    });
+
+    // Leave random video call
+    socket.on('leave-random-videocall', (roomId) => {
+      console.log(`Socket ${socket.id} leaving random video call ${roomId}`);
+      socket.to(roomId).emit('user-left-random-videocall', socket.id);
+      socket.leave(roomId);
     });
 
     // ====== PING FUNCTIONALITY ======
@@ -99,63 +185,14 @@ export const setupSocketIO = (io) => {
       }
     });
 
-    // Join a video call - Enhanced with better error handling
-    socket.on('join-video-call', (callId, peerId) => {
-      try {
-        const currentRooms = Array.from(socket.rooms);
-        
-        if (currentRooms.includes(callId)) {
-          console.log(`Socket ${socket.id} already in room ${callId}, skipping join`);
-          return;
-        }
-        
-        console.log(`Socket ${socket.id} joining video call ${callId} with peer ID ${peerId}`);
-        socket.join(callId);
-        
-        // Store the peer ID on the socket for reference
-        socket.peerId = peerId;
-        
-        // Get room size and only emit if there are other participants
-        const room = io.sockets.adapter.rooms.get(callId);
-        const roomSize = room ? room.size : 0;
-        
-        console.log(`Room ${callId} now has ${roomSize} participants`);
-        
-        // Send confirmation back to the joiner
-        socket.emit('video-call-joined', { callId, peerId, roomSize });
-        
-        if (roomSize > 1) {
-          // Notify existing users about the new participant
-          socket.to(callId).emit('user-joined-video-call', peerId);
-          console.log(`Notified ${roomSize - 1} users about new participant ${peerId}`);
-        }
-      } catch (error) {
-        console.error(`Error joining video call ${callId}:`, error);
-        socket.emit('video-call-error', { error: 'Failed to join call' });
+    // Handle disconnection
+    socket.on('disconnect', () => {
+      console.log('User disconnected:', socket.id);
+      
+      // If user was in a video call, notify others
+      if (socket.currentCallId && socket.peerId) {
+        socket.to(socket.currentCallId).emit('user-left-video-call', socket.peerId);
       }
-    });
-
-    // Leave a video call
-    socket.on('leave-video-call', (callId) => {
-      console.log(`Socket ${socket.id} leaving video call ${callId}`);
-      socket.to(callId).emit('user-left-video-call', socket.id);
-      socket.leave(callId);
-    });
-
-    // ====== RANDOM VIDEO CALL FUNCTIONALITY ======
-    
-    // Join random video call
-    socket.on('join-random-videocall', (roomId, peerId) => {
-      console.log(`Socket ${socket.id} joining random video call ${roomId} with peer ID ${peerId}`);
-      socket.join(roomId);
-      socket.to(roomId).emit('user-joined-random-videocall', peerId);
-    });
-
-    // Leave random video call
-    socket.on('leave-random-videocall', (roomId) => {
-      console.log(`Socket ${socket.id} leaving random video call ${roomId}`);
-      socket.to(roomId).emit('user-left-random-videocall', socket.id);
-      socket.leave(roomId);
     });
   });
 };
