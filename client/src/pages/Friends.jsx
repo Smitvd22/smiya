@@ -13,8 +13,15 @@ function Friends() {
   const [friendRequests, setFriendRequests] = useState([]);
   const navigate = useNavigate();
   
-  // Fix API URL to use REACT_APP prefix (required for React apps)
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  // Environment-aware API URL
+  const API_URL = process.env.REACT_APP_API_URL || 
+    (process.env.NODE_ENV === 'production' 
+      ? 'https://smiya.onrender.com/api' 
+      : 'http://localhost:5000/api'
+    );
+
+  console.log('API_URL configured as:', API_URL);
+  console.log('Environment:', process.env.NODE_ENV);
 
   // Memoize the fetchFriends function
   const fetchFriends = useCallback(async () => {

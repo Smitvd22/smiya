@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { createServer } from 'http';
 import { pool } from './config/db.js';
 import { initializeSocketIO } from './sockets/index.js';
 import { initializeDatabase } from './config/schema.js';
@@ -8,18 +9,45 @@ import friendRoutes from './routes/friendRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
 import { v4 as uuidv4 } from 'uuid';
+import { setupPeerServer } from './peerServer.js';
 
 const app = express();
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const PORT = process.env.PORT || 5000;
 
+// Create HTTP server
+const server = createServer(app);
+
 // Middleware
 app.use(express.json());
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  credentials: true
-}));
+
+// Enhanced CORS configuration
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = process.env.ALLOWED_ORIGINS 
+      ? process.env.ALLOWED_ORIGINS.split(',')
+      : [
+          'http://localhost:3000',
+          'http://127.0.0.1:3000',
+          'https://smiya.onrender.com'
+        ];
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.warn('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
 
 // Initialize database schema
 initializeDatabase().catch(console.error);
@@ -60,13 +88,18 @@ pool.query('SELECT NOW()', (err) => {
   else console.log(`Connected to database (${NODE_ENV} environment)`);
 });
 
-// Socket.io Setup
-const server = app.listen(PORT, () => {
-  const localUrl = `http://localhost:${PORT}`;
-  console.log(`Server running on port ${PORT} in ${NODE_ENV} mode`);
-  console.log(`📡 API Status: ${localUrl}/api/status`);
-  console.log(`🚀 Server: \x1b[36m${localUrl}\x1b[0m`);
+// Start server
+server.listen(PORT, () => {
+  const isProduction = NODE_ENV === 'production';
+  const baseUrl = isProduction ? 'https://smiya.onrender.com' : `http://localhost:${PORT}`;
+  
+  console.log(`🚀 Server running on port ${PORT} in ${NODE_ENV} mode`);
+  console.log(`📡 API Status: ${baseUrl}/api/status`);
+  console.log(`🌐 Server: \x1b[36m${baseUrl}\x1b[0m`);
 });
 
 // Initialize Socket.IO with unified handlers
 initializeSocketIO(server, app);
+
+// Setup PeerJS server for development
+setupPeerServer(server);

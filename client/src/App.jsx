@@ -11,6 +11,7 @@ import { getCurrentUser } from './services/authService';
 import { CallProvider } from './contexts/CallContext';
 import './App.css';
 import './styles/LoveTheme.css';
+import VideoCall from './pages/VideoCall';
 
 function App() {
   // Function to check if user is authenticated
@@ -70,6 +71,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Chat />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/videocall/:callId"
+              element={
+                <ProtectedRoute>
+                  <VideoCall />
                 </ProtectedRoute>
               }
             />

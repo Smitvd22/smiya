@@ -409,6 +409,70 @@ function Chat() {
     );
   };
 
+  // Add function to start video call
+  const startVideoCall = () => {
+    console.log('Video call button clicked');
+    console.log('Socket connected:', socketConnected);
+    console.log('Socket object:', socket);
+    console.log('Friend ID:', friendId);
+    console.log('Current user:', getCurrentUser());
+    
+    if (!socketConnected) {
+      setError('Not connected to server. Please wait and try again.');
+      return;
+    }
+    
+    const callId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    console.log('Generated call ID:', callId);
+    
+    // Ensure socket is connected before sending invitation
+    if (socket && socketConnected) {
+      console.log('Sending video call invitation:', {
+        callId,
+        fromUserId: getCurrentUser().id,
+        toUserId: parseInt(friendId),
+        fromUsername: getCurrentUser().username
+      });
+      
+      socket.emit('video-call-invitation', {
+        callId,
+        fromUserId: getCurrentUser().id,
+        toUserId: parseInt(friendId),
+        fromUsername: getCurrentUser().username
+      });
+      
+      // Navigate to video call page
+      navigate(`/videocall/${callId}`);
+    } else {
+      setError('Connection not available. Please wait and try again.');
+      console.error('Socket not connected for video call');
+    }
+  };
+
+  // Listen for video call invitations
+  useEffect(() => {
+    if (!socket) return;
+    
+    const handleVideoCallInvitation = (data) => {
+      const { callId, fromUsername } = data; // Remove fromUserId since it's not used
+      
+      // Show confirmation dialog
+      const shouldJoin = window.confirm(
+        `${fromUsername} is inviting you to a video call. Do you want to join?`
+      );
+      
+      if (shouldJoin) {
+        navigate(`/videocall/${callId}`);
+      }
+    };
+    
+    socket.on('video-call-invitation', handleVideoCallInvitation);
+    
+    return () => {
+      socket.off('video-call-invitation', handleVideoCallInvitation);
+    };
+  }, [socket, navigate]);
+
   return (
     <div className="chat-container">
       <div className="chat-header">
@@ -423,6 +487,16 @@ function Chat() {
           ) : 'Loading...'}
         </h2>
         
+        {/* Add video call button */}
+        <div className="chat-actions">
+          <button 
+            onClick={startVideoCall} 
+            className="video-call-btn"
+            disabled={!socketConnected}
+          >
+            📹 Video Call
+          </button>
+        </div>
       </div>
       
       {error && <div className="error-message">{error}</div>}

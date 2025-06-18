@@ -98,15 +98,13 @@ export const getCurrentUser = () => {
 };
 
 // Update the initializeSocket function to include a debug parameter
-export const initializeSocket = (debug = false) => {
-  // If socket exists and is connected, return it
+export const initializeSocket = () => {
   if (socket && socket.connected) {
-    if (debug) console.log('Reusing existing socket connection:', socket.id);
     return socket;
   }
   
-  // If socket exists but is disconnected, clean it up
-  if (socket) {
+  // Clean up any existing disconnected socket
+  if (socket && !socket.connected) {
     console.log('Cleaning up disconnected socket');
     socket.disconnect();
     socket = null;
@@ -116,14 +114,26 @@ export const initializeSocket = (debug = false) => {
   if (!user) return null;
   
   console.log('Creating new socket connection');
-  socket = io(process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000', {
+  
+  // Environment-aware socket URL
+  const socketUrl = process.env.REACT_APP_SOCKET_URL || 
+    (process.env.NODE_ENV === 'production' 
+      ? 'https://smiya.onrender.com' 
+      : 'http://localhost:5000'
+    );
+  
+  console.log('Connecting to socket URL:', socketUrl);
+  
+  socket = io(socketUrl, {
     reconnection: true,
     reconnectionAttempts: 10,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
     timeout: 20000,
-    transports: ['websocket', 'polling'], // Allow fallback to polling
-    auth: { userId: user.id }
+    transports: ['websocket', 'polling'],
+    auth: { userId: user.id },
+    forceNew: false,
+    upgrade: true
   });
   
   socket.on('connect', () => {
