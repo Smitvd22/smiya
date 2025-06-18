@@ -99,16 +99,39 @@ export const setupSocketIO = (io) => {
       }
     });
 
-    // Join a video call
+    // Join a video call - Enhanced with better error handling
     socket.on('join-video-call', (callId, peerId) => {
-      // Check if already in room to prevent duplicate joins
-      const currentRooms = Array.from(socket.rooms);
-      if (!currentRooms.includes(callId)) {
+      try {
+        const currentRooms = Array.from(socket.rooms);
+        
+        if (currentRooms.includes(callId)) {
+          console.log(`Socket ${socket.id} already in room ${callId}, skipping join`);
+          return;
+        }
+        
         console.log(`Socket ${socket.id} joining video call ${callId} with peer ID ${peerId}`);
         socket.join(callId);
-        socket.to(callId).emit('user-joined-video-call', peerId);
-      } else {
-        console.log(`Socket ${socket.id} already in room ${callId}, skipping join`);
+        
+        // Store the peer ID on the socket for reference
+        socket.peerId = peerId;
+        
+        // Get room size and only emit if there are other participants
+        const room = io.sockets.adapter.rooms.get(callId);
+        const roomSize = room ? room.size : 0;
+        
+        console.log(`Room ${callId} now has ${roomSize} participants`);
+        
+        // Send confirmation back to the joiner
+        socket.emit('video-call-joined', { callId, peerId, roomSize });
+        
+        if (roomSize > 1) {
+          // Notify existing users about the new participant
+          socket.to(callId).emit('user-joined-video-call', peerId);
+          console.log(`Notified ${roomSize - 1} users about new participant ${peerId}`);
+        }
+      } catch (error) {
+        console.error(`Error joining video call ${callId}:`, error);
+        socket.emit('video-call-error', { error: 'Failed to join call' });
       }
     });
 

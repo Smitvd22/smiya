@@ -96,6 +96,7 @@ server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT} in ${NODE_ENV} mode`);
   console.log(`📡 API Status: ${baseUrl}/api/status`);
   console.log(`🌐 Server: \x1b[36m${baseUrl}\x1b[0m`);
+  console.log(`🎥 Video calls using cloud PeerJS service`); // Add this line
 });
 
 // Initialize Socket.IO with unified handlers
