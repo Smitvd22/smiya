@@ -66,6 +66,7 @@ const VideoCall = () => {
     }
   }, []);
   
+  // Enhanced cleanup function
   const cleanup = useCallback(() => {
     if (hasCleanedUp.current) {
       console.log('Cleanup already performed, skipping...');
@@ -75,43 +76,80 @@ const VideoCall = () => {
     console.log('Cleaning up video call...');
     hasCleanedUp.current = true;
     
-    // Clean up media streams
+    // Stop ALL media tracks immediately
     if (myStream.current) {
+      console.log('Stopping media tracks...');
       myStream.current.getTracks().forEach(track => {
+        console.log(`Stopping ${track.kind} track:`, track.label);
         track.stop();
+        track.enabled = false; // Ensure track is disabled
       });
       myStream.current = null;
     }
     
-    // Clean up video elements
+    // Force video element cleanup
     if (myVideo.current) {
+      myVideo.current.pause();
       myVideo.current.srcObject = null;
-    }
-    if (remoteVideo.current) {
-      remoteVideo.current.srcObject = null;
+      myVideo.current.load();
+      // Add explicit stream removal
+      myVideo.current.src = '';
     }
     
-    // Close peer connection
-    if (currentCall.current) {
-      currentCall.current.close();
-      currentCall.current = null;
+    if (remoteVideo.current) {
+      remoteVideo.current.pause();
+      remoteVideo.current.srcObject = null;
+      remoteVideo.current.load();
+      remoteVideo.current.src = '';
     }
-
-    // Clean up socket listeners and leave room
-    if (peerInstance.current && peerInstance.current.cleanupListeners) {
-      peerInstance.current.cleanupListeners();
+    
+    // Enhanced peer cleanup
+    if (currentCall.current) {
+      try {
+        currentCall.current.close();
+      } catch (err) {
+        console.warn('Error closing call:', err);
+      }
+      currentCall.current = null;
     }
     
     if (peerInstance.current) {
-      peerInstance.current.destroy();
+      try {
+        // Disconnect all connections first
+        Object.values(peerInstance.current.connections).forEach(conns => {
+          conns.forEach(conn => conn.close());
+        });
+        
+        if (peerInstance.current.cleanupListeners) {
+          peerInstance.current.cleanupListeners();
+        }
+        
+        peerInstance.current.destroy();
+      } catch (err) {
+        console.warn('Error destroying peer:', err);
+      }
       peerInstance.current = null;
     }
     
-    // Leave the room
+    // Clean up socket listeners and leave room
     const socket = getSocket();
     if (socket && callId) {
-      socket.emit('leave-video-call', callId);
+      try {
+        socket.emit('leave-video-call', callId);
+        // Clean up any remaining listeners
+        socket.off('user-joined-video-call');
+        socket.off('user-left-video-call');
+        socket.off('existing-participants');
+      } catch (err) {
+        console.warn('Error cleaning up socket:', err);
+      }
     }
+    
+    // Reset permissions to force fresh camera access
+    setHasVideoPermission(false);
+    setHasAudioPermission(false);
+    setIsVideoEnabled(false);
+    setIsAudioEnabled(false);
   }, [callId, getSocket]);
 
   const getPeerJSConfig = useCallback(() => {
@@ -129,7 +167,11 @@ const VideoCall = () => {
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
             { urls: 'stun:global.stun.twilio.com:3478' }
-          ]
+          ],
+          // Add these for better connectivity
+          iceCandidatePoolSize: 10,
+          bundlePolicy: 'max-bundle',
+          rtcpMuxPolicy: 'require'
         }
       };
     }
@@ -150,7 +192,10 @@ const VideoCall = () => {
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:global.stun.twilio.com:3478' }
-        ]
+        ],
+        iceCandidatePoolSize: 10,
+        bundlePolicy: 'max-bundle',
+        rtcpMuxPolicy: 'require'
       }
     };
   }, []);
@@ -214,30 +259,50 @@ const VideoCall = () => {
 
         console.log('✅ Socket connected');
 
-        // Step 2: Get media permissions
+        // Step 2: Get media permissions - with better error handling
         console.log('🎥 Requesting media permissions...');
+        let mediaStream = null;
+        
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({ 
+          // Try to get both video and audio
+          mediaStream = await navigator.mediaDevices.getUserMedia({ 
             video: true, 
             audio: true 
           });
           
           console.log('✅ Media permissions granted');
-          myStream.current = stream;
+          myStream.current = mediaStream;
           setHasVideoPermission(true);
           setHasAudioPermission(true);
           setIsVideoEnabled(true);
           setIsAudioEnabled(true);
           
-          if (myVideo.current && isComponentMounted.current) {
-            myVideo.current.srcObject = stream;
-            myVideo.current.play().catch(console.warn);
-          }
         } catch (err) {
-          console.warn('⚠️ Media permissions denied, continuing without media:', err);
-          myStream.current = new MediaStream();
-          setHasVideoPermission(false);
-          setHasAudioPermission(false);
+          console.warn('⚠️ Full media access denied, trying alternatives:', err);
+          
+          // Try audio only
+          try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            console.log('✅ Audio-only permission granted');
+            myStream.current = mediaStream;
+            setHasAudioPermission(true);
+            setIsAudioEnabled(true);
+            setHasVideoPermission(false);
+            setIsVideoEnabled(false);
+          } catch (audioErr) {
+            console.warn('⚠️ No media permissions, continuing without media:', audioErr);
+            myStream.current = new MediaStream();
+            setHasVideoPermission(false);
+            setHasAudioPermission(false);
+            setIsVideoEnabled(false);
+            setIsAudioEnabled(false);
+          }
+        }
+
+        // Update video element
+        if (myVideo.current && isComponentMounted.current && myStream.current) {
+          myVideo.current.srcObject = myStream.current;
+          myVideo.current.play().catch(console.warn);
         }
 
         // Step 3: Initialize PeerJS
@@ -249,10 +314,10 @@ const VideoCall = () => {
         peerInstance.current = peer;
         
         // Wait for PeerJS to be ready
-        await new Promise((resolve, reject) => {
+        const peerId = await new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
             reject(new Error('PeerJS initialization timeout'));
-          }, 10000);
+          }, 15000); // Increase timeout
           
           peer.on('open', (id) => {
             clearTimeout(timeout);
@@ -268,17 +333,19 @@ const VideoCall = () => {
           });
         });
 
-        // Step 4: Set up peer event handlers BEFORE joining room
+        // Step 4: Set up peer event handlers
         peer.on('call', (call) => {
           if (!isComponentMounted.current || hasCleanedUp.current) return;
           
           console.log('📞 Receiving call from:', call.peer);
-          setConnectionStatus('connected');
           
           const streamToAnswer = myStream.current || new MediaStream();
           console.log('Answering call with stream:', streamToAnswer.getTracks().length, 'tracks');
           call.answer(streamToAnswer);
           currentCall.current = call;
+          
+          // Set status to connecting when answering
+          setConnectionStatus('connecting');
           
           call.on('stream', (remoteStream) => {
             if (isComponentMounted.current && remoteVideo.current) {
@@ -293,6 +360,10 @@ const VideoCall = () => {
               
               const videoTracks = remoteStream.getVideoTracks();
               setIsRemoteVideoEnabled(videoTracks.length > 0 && videoTracks[0].enabled);
+              
+              // UPDATE STATUS TO CONNECTED when stream is received
+              setConnectionStatus('connected');
+              setIsLoading(false);
             }
           });
           
@@ -300,18 +371,26 @@ const VideoCall = () => {
             console.log('Call ended by remote peer');
             if (isComponentMounted.current) handleCallEnd();
           });
+          
+          // Add connection state monitoring
+          call.on('error', (err) => {
+            console.error('Call error:', err);
+            setConnectionStatus('error');
+            setError(`Call failed: ${err.message}`);
+          });
         });
 
         // Step 5: Set up socket event handlers
         const handleUserJoined = (userId) => {
-          if (!isComponentMounted.current || !peerInstance.current || userId === myPeerId) {
+          if (!isComponentMounted.current || !peerInstance.current || userId === peerId) {
+            console.log('Ignoring user joined event:', { userId, myPeerId: peerId });
             return;
           }
           
           console.log('👤 User joined, initiating call to:', userId);
           setConnectionStatus('calling');
           
-          // Small delay to ensure both peers are ready
+          // Delay to ensure both peers are ready
           setTimeout(() => {
             if (!isComponentMounted.current || !peerInstance.current) return;
             
@@ -319,7 +398,11 @@ const VideoCall = () => {
             console.log('📞 Initiating call with stream:', streamToSend.getTracks().length, 'tracks');
             
             const call = peerInstance.current.call(userId, streamToSend);
-            if (!call) return;
+            if (!call) {
+              console.error('Failed to create call');
+              setConnectionStatus('error');
+              return;
+            }
             
             currentCall.current = call;
             
@@ -333,36 +416,63 @@ const VideoCall = () => {
                 
                 remoteVideo.current.srcObject = remoteStream;
                 remoteVideo.current.play().catch(console.warn);
+                
+                // UPDATE STATUS TO CONNECTED when stream is received
                 setConnectionStatus('connected');
+                setIsLoading(false);
                 
                 const videoTracks = remoteStream.getVideoTracks();
                 setIsRemoteVideoEnabled(videoTracks.length > 0 && videoTracks[0].enabled);
               }
             });
             
+            // Add connection established handler
+            call.on('open', () => {
+              console.log('✅ Call connection established');
+              // Don't set to connected here, wait for stream
+              setConnectionStatus('connecting');
+            });
+            
             call.on('close', () => {
               if (isComponentMounted.current) handleCallEnd();
             });
             
-          }, 1000); // 1 second delay
+            call.on('error', (err) => {
+              console.error('Outgoing call error:', err);
+              setConnectionStatus('error');
+              setError(`Call failed: ${err.message}`);
+            });
+            
+          }, 1000);
         };
 
         const handleUserLeft = () => {
           if (isComponentMounted.current) handleCallEnd();
         };
 
+        // Handle existing participants
+        const handleExistingParticipants = (participants) => {
+          console.log('Existing participants received:', participants);
+          participants.forEach(participantId => {
+            handleUserJoined(participantId);
+          });
+        };
+
         socket.on('user-joined-video-call', handleUserJoined);
         socket.on('user-left-video-call', handleUserLeft);
+        socket.on('existing-participants', handleExistingParticipants);
         
         // Store cleanup function
         peer.cleanupListeners = () => {
           socket.off('user-joined-video-call', handleUserJoined);
           socket.off('user-left-video-call', handleUserLeft);
+          socket.off('existing-participants', handleExistingParticipants);
         };
 
-        // Step 6: Join the video call room
-        console.log('🏠 Joining video call room:', callId);
-        socket.emit('join-video-call', callId, myPeerId);
+        // Step 6: Join the video call room with proper peer ID
+        console.log('🏠 Joining video call room:', callId, 'with peer ID:', peerId);
+        socket.emit('join-video-call', callId, peerId);
+        
         setConnectionStatus('waiting');
         setIsLoading(false);
         
@@ -382,7 +492,7 @@ const VideoCall = () => {
     })();
 
     return initializationPromise.current;
-  }, [callId, getPeerJSConfig, myPeerId, handleCallEnd, getSocket]);
+  }, [callId, getPeerJSConfig, handleCallEnd, getSocket]);
 
   // FIXED: Single initialization on mount
   useEffect(() => {
@@ -410,21 +520,50 @@ const VideoCall = () => {
     };
   }, [callId]); // Only depend on callId
 
-  // Control functions
+  // Update video element handling
+  useEffect(() => {
+    if (myVideo.current && myStream.current && hasVideoPermission && isVideoEnabled) {
+      myVideo.current.srcObject = myStream.current;
+      myVideo.current.play().catch(err => {
+        console.warn('Error playing local video:', err);
+      });
+    } else if (myVideo.current && (!hasVideoPermission || !isVideoEnabled)) {
+      myVideo.current.srcObject = null;
+    }
+  }, [hasVideoPermission, isVideoEnabled, myStream.current]);
+
+  // Enhanced toggle video function
   const toggleVideo = () => {
     if (!hasVideoPermission) {
       navigator.mediaDevices.getUserMedia({ video: true })
         .then(stream => {
           const videoTrack = stream.getVideoTracks()[0];
           if (myStream.current) {
+            // Remove existing video tracks first
+            myStream.current.getVideoTracks().forEach(track => {
+              myStream.current.removeTrack(track);
+              track.stop(); // Stop the old track
+            });
             myStream.current.addTrack(videoTrack);
           } else {
             myStream.current = stream;
           }
           setHasVideoPermission(true);
           setIsVideoEnabled(true);
+          
+          // Update video element
           if (myVideo.current) {
             myVideo.current.srcObject = myStream.current;
+            myVideo.current.play().catch(console.warn);
+          }
+          
+          // Update peer connection with new stream
+          if (currentCall.current && currentCall.current.peerConnection) {
+            currentCall.current.peerConnection.getSenders().forEach(sender => {
+              if (sender.track && sender.track.kind === 'video') {
+                sender.replaceTrack(videoTrack);
+              }
+            });
           }
         })
         .catch(err => {
@@ -437,8 +576,37 @@ const VideoCall = () => {
     if (myStream.current) {
       const videoTrack = myStream.current.getVideoTracks()[0];
       if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setIsVideoEnabled(videoTrack.enabled);
+        if (!videoTrack.enabled) {
+          // Turning video ON
+          videoTrack.enabled = true;
+          setIsVideoEnabled(true);
+          
+          if (myVideo.current) {
+            myVideo.current.srcObject = myStream.current;
+            myVideo.current.play().catch(console.warn);
+          }
+        } else {
+          // Turning video OFF - STOP the track completely
+          videoTrack.enabled = false;
+          videoTrack.stop(); // Actually stop the camera
+          myStream.current.removeTrack(videoTrack); // Remove from stream
+          setIsVideoEnabled(false);
+          
+          // Clear video element
+          if (myVideo.current) {
+            myVideo.current.srcObject = null;
+            myVideo.current.src = '';
+          }
+          
+          // Update peer connection
+          if (currentCall.current && currentCall.current.peerConnection) {
+            currentCall.current.peerConnection.getSenders().forEach(sender => {
+              if (sender.track && sender.track.kind === 'video') {
+                sender.replaceTrack(null); // Remove video track from peer
+              }
+            });
+          }
+        }
       }
     }
   };
@@ -477,16 +645,76 @@ const VideoCall = () => {
     navigate(-1);
   };
 
+  // Add connection timeout handling
+  useEffect(() => {
+    let connectionTimeout;
+    
+    if (connectionStatus === 'calling' || connectionStatus === 'connecting') {
+      connectionTimeout = setTimeout(() => {
+        if (connectionStatus !== 'connected') {
+          console.warn('Connection timeout, retrying...');
+          setError('Connection timeout. Retrying...');
+          
+          // Attempt retry
+          setTimeout(() => {
+            handleRetry();
+          }, 2000);
+        }
+      }, 15000); // 15 second timeout
+    }
+    
+    return () => {
+      if (connectionTimeout) clearTimeout(connectionTimeout);
+    };
+  }, [connectionStatus]);
+
+  // Enhanced retry function
   const handleRetry = () => {
     console.log('🔄 Manual retry initiated');
+    
+    // Force cleanup first
+    cleanup();
+    
+    // Reset all state
     hasInitialized.current = false;
     hasCleanedUp.current = false;
     initializationPromise.current = null;
+    
     setIsLoading(true);
     setError('');
     setConnectionStatus('connecting');
-    initializeVideoCall();
+    setHasVideoPermission(false);
+    setHasAudioPermission(false);
+    setIsVideoEnabled(false);
+    setIsAudioEnabled(false);
+    setIsRemoteVideoEnabled(false);
+    setMyPeerId('');
+    
+    // Wait for cleanup to complete
+    setTimeout(() => {
+      initializeVideoCall();
+    }, 1000);
   };
+
+  // Enhanced beforeunload handler
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      console.log('Page unloading, cleaning up media...');
+      if (myStream.current) {
+        myStream.current.getTracks().forEach(track => {
+          track.stop();
+          track.enabled = false;
+        });
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      handleBeforeUnload(); // Cleanup on component unmount
+    };
+  }, []);
 
   // Loading state
   if (isLoading) {
@@ -586,18 +814,26 @@ const VideoCall = () => {
       <div className="video-grid">
         {/* Local video */}
         <div className="video-container local-video">
-          {hasVideoPermission && isVideoEnabled ? (
+          {hasVideoPermission && isVideoEnabled && myStream.current ? (
             <video 
               ref={myVideo}
               muted
               autoPlay
               playsInline
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           ) : (
             <div className="video-placeholder black-screen">
               <div className="placeholder-content">
                 <span className="placeholder-icon">👤</span>
-                <p>You {!hasVideoPermission ? '(Camera Off)' : '(Video Disabled)'}</p>
+                <p>
+                  {!hasVideoPermission 
+                    ? 'Camera Access Denied' 
+                    : !isVideoEnabled 
+                    ? 'Camera Off' 
+                    : 'Loading Camera...'
+                  }
+                </p>
               </div>
             </div>
           )}
@@ -612,6 +848,7 @@ const VideoCall = () => {
                 ref={remoteVideo}
                 autoPlay
                 playsInline
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
             ) : (
               <div className="video-placeholder black-screen">

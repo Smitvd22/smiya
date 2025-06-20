@@ -441,8 +441,8 @@ function Chat() {
         fromUsername: getCurrentUser().username
       });
       
-      // Navigate to video call page
-      navigate(`/videocall/${callId}`);
+      // Navigate to video call page with replace to prevent back navigation issues
+      navigate(`/videocall/${callId}`, { replace: true });
     } else {
       setError('Connection not available. Please wait and try again.');
       console.error('Socket not connected for video call');
@@ -454,7 +454,7 @@ function Chat() {
     if (!socket) return;
     
     const handleVideoCallInvitation = (data) => {
-      const { callId, fromUsername } = data; // Remove fromUserId since it's not used
+      const { callId, fromUsername } = data;
       
       // Show confirmation dialog
       const shouldJoin = window.confirm(
@@ -462,7 +462,8 @@ function Chat() {
       );
       
       if (shouldJoin) {
-        navigate(`/videocall/${callId}`);
+        // Use replace to prevent navigation stack issues
+        navigate(`/videocall/${callId}`, { replace: true });
       }
     };
     

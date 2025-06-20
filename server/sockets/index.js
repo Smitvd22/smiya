@@ -64,6 +64,13 @@ export const setupSocketIO = (io) => {
       try {
         console.log(`Socket ${socket.id} attempting to join video call ${callId} with peer ID ${peerId}`);
         
+        // Validate peerId
+        if (!peerId) {
+          console.error('No peer ID provided for join-video-call');
+          socket.emit('video-call-error', { error: 'No peer ID provided' });
+          return;
+        }
+        
         // Store the peer ID on the socket BEFORE joining
         socket.peerId = peerId;
         socket.currentCallId = callId;
@@ -79,7 +86,7 @@ export const setupSocketIO = (io) => {
         
         // Join the room
         socket.join(callId);
-        console.log(`Socket ${socket.id} successfully joined video call ${callId}`);
+        console.log(`Socket ${socket.id} successfully joined video call ${callId} with peer ID: ${peerId}`);
         
         // Get room info
         const room = io.sockets.adapter.rooms.get(callId);
@@ -97,9 +104,11 @@ export const setupSocketIO = (io) => {
         
         // If there are other participants, notify them and send existing participants to new joiner
         if (roomSize > 1) {
-          // Notify existing users about new participant
-          socket.to(callId).emit('user-joined-video-call', peerId);
-          console.log(`Notified ${roomSize - 1} users about new participant ${peerId}`);
+          // Notify existing users about new participant with a delay
+          setTimeout(() => {
+            socket.to(callId).emit('user-joined-video-call', peerId);
+            console.log(`Notified ${roomSize - 1} users about new participant ${peerId}`);
+          }, 1000);
           
           // Send existing participants to the new joiner
           const existingPeers = [];
@@ -111,10 +120,11 @@ export const setupSocketIO = (io) => {
           });
           
           if (existingPeers.length > 0) {
-            // Small delay to ensure the peer is ready
+            // Send existing participants to new joiner
             setTimeout(() => {
               socket.emit('existing-participants', existingPeers);
-            }, 500);
+              console.log(`Sent existing participants to ${peerId}:`, existingPeers);
+            }, 1500);
           }
         }
       } catch (error) {
