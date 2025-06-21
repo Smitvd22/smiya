@@ -443,8 +443,8 @@ function Chat() {
       // IMPORTANT: Clearly log that this user is the initiator
       console.log('🎭 ROLE ASSIGNMENT: User is INITIATOR of the call');
       
-      // Navigate with clear initiator flag
-      navigate(`/videocall/${callId}?from=chat`, { 
+      // Navigate with clear initiator flag using React Router's state
+      navigate(`/videocall/${callId}`, { 
         replace: true,
         state: {
           isInitiator: true,
@@ -471,11 +471,11 @@ function Chat() {
       );
       
       if (shouldJoin) {
-        // Use replace to prevent navigation stack issues - pass role information
+        // Use replace to prevent navigation stack issues - EXPLICITLY set isInitiator to false
         navigate(`/videocall/${callId}`, { 
           replace: true,
           state: {
-            isInitiator: false,
+            isInitiator: false, // Explicitly set to false for the receiver
             fromUserId: fromUserId,
             toUserId: getCurrentUser().id
           }
