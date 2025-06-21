@@ -413,9 +413,6 @@ function Chat() {
   const startVideoCall = () => {
     console.log('Video call button clicked');
     console.log('Socket connected:', socketConnected);
-    console.log('Socket object:', socket);
-    console.log('Friend ID:', friendId);
-    console.log('Current user:', getCurrentUser());
     
     if (!socketConnected) {
       setError('Not connected to server. Please wait and try again.');
@@ -427,22 +424,34 @@ function Chat() {
     
     // Ensure socket is connected before sending invitation
     if (socket && socketConnected) {
+      const currentUser = getCurrentUser();
+      
       console.log('Sending video call invitation:', {
         callId,
-        fromUserId: getCurrentUser().id,
+        fromUserId: currentUser.id,
         toUserId: parseInt(friendId),
-        fromUsername: getCurrentUser().username
+        fromUsername: currentUser.username
       });
       
       socket.emit('video-call-invitation', {
         callId,
-        fromUserId: getCurrentUser().id,
+        fromUserId: currentUser.id,
         toUserId: parseInt(friendId),
-        fromUsername: getCurrentUser().username
+        fromUsername: currentUser.username
       });
       
-      // Navigate to video call page with replace to prevent back navigation issues
-      navigate(`/videocall/${callId}`, { replace: true });
+      // IMPORTANT: Clearly log that this user is the initiator
+      console.log('🎭 ROLE ASSIGNMENT: User is INITIATOR of the call');
+      
+      // Navigate with clear initiator flag
+      navigate(`/videocall/${callId}?from=chat`, { 
+        replace: true,
+        state: {
+          isInitiator: true,
+          fromUserId: currentUser.id,
+          toUserId: parseInt(friendId)
+        }
+      });
     } else {
       setError('Connection not available. Please wait and try again.');
       console.error('Socket not connected for video call');
@@ -454,7 +463,7 @@ function Chat() {
     if (!socket) return;
     
     const handleVideoCallInvitation = (data) => {
-      const { callId, fromUsername } = data;
+      const { callId, fromUserId, fromUsername } = data;
       
       // Show confirmation dialog
       const shouldJoin = window.confirm(
@@ -462,8 +471,15 @@ function Chat() {
       );
       
       if (shouldJoin) {
-        // Use replace to prevent navigation stack issues
-        navigate(`/videocall/${callId}`, { replace: true });
+        // Use replace to prevent navigation stack issues - pass role information
+        navigate(`/videocall/${callId}`, { 
+          replace: true,
+          state: {
+            isInitiator: false,
+            fromUserId: fromUserId,
+            toUserId: getCurrentUser().id
+          }
+        });
       }
     };
     

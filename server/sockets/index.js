@@ -9,7 +9,7 @@ export const setupSocketIO = (io) => {
   const findUserSocket = (userId) => {
     // Convert userId to string for comparison
     const userIdStr = userId.toString();
-    
+
     // Search through all connected sockets to find the one with matching userId
     for (const [socketId, socket] of io.sockets.sockets) {
       if (socket.userId === userIdStr) {
@@ -21,15 +21,15 @@ export const setupSocketIO = (io) => {
 
   io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
-    
+
     // ====== ROOM MANAGEMENT ======
-    
+
     // Join a specific chat room (for private messaging)
     socket.on('join-room', (roomId) => {
       socket.join(roomId);
       console.log(`Socket ${socket.id} joined room: ${roomId}`);
     });
-    
+
     // Join personal room for receiving calls and store user ID
     socket.on('join-user-room', (roomId) => {
       socket.join(roomId);
@@ -38,18 +38,18 @@ export const setupSocketIO = (io) => {
       socket.userId = userId;
       console.log(`Socket ${socket.id} joined room: ${roomId}, userId: ${userId}`);
     });
-    
+
     // ====== MESSAGING FUNCTIONALITY ======
-    
+
     // Handle new message events (needed if clients emit messages directly through socket)
     socket.on('send-message', (message) => {
       const chatRoom = [message.senderId, message.receiverId].sort().join('-');
       io.to(chatRoom).emit('new-message', message);
       console.log(`Message sent in room ${chatRoom}`);
     });
-    
+
     // ====== USER PRESENCE ======
-    
+
     // Handle user online status (optional enhancement)
     socket.on('set-status', (status) => {
       // Store user status if needed
@@ -58,23 +58,23 @@ export const setupSocketIO = (io) => {
         status: status
       });
     });
-    
+
     // Join a video call - FIXED: Better handling to prevent early leaves
     socket.on('join-video-call', (callId, peerId) => {
       try {
         console.log(`Socket ${socket.id} attempting to join video call ${callId} with peer ID ${peerId}`);
-        
+
         // Validate peerId
         if (!peerId) {
           console.error('No peer ID provided for join-video-call');
           socket.emit('video-call-error', { error: 'No peer ID provided' });
           return;
         }
-        
+
         // Store the peer ID on the socket BEFORE joining
         socket.peerId = peerId;
         socket.currentCallId = callId;
-        
+
         // Check if already in room
         const currentRooms = Array.from(socket.rooms);
         if (currentRooms.includes(callId)) {
@@ -83,25 +83,25 @@ export const setupSocketIO = (io) => {
           socket.to(callId).emit('user-joined-video-call', peerId);
           return;
         }
-        
+
         // Join the room
         socket.join(callId);
         console.log(`Socket ${socket.id} successfully joined video call ${callId} with peer ID: ${peerId}`);
-        
+
         // Get room info
         const room = io.sockets.adapter.rooms.get(callId);
         const roomSize = room ? room.size : 0;
-        
+
         console.log(`Room ${callId} now has ${roomSize} participants`);
-        
+
         // Send confirmation to the joiner
-        socket.emit('video-call-joined', { 
-          callId, 
-          peerId, 
+        socket.emit('video-call-joined', {
+          callId,
+          peerId,
           roomSize,
-          success: true 
+          success: true
         });
-        
+
         // If there are other participants, notify them and send existing participants to new joiner
         if (roomSize > 1) {
           // Notify existing users about new participant with a delay
@@ -109,7 +109,7 @@ export const setupSocketIO = (io) => {
             socket.to(callId).emit('user-joined-video-call', peerId);
             console.log(`Notified ${roomSize - 1} users about new participant ${peerId}`);
           }, 1000);
-          
+
           // Send existing participants to the new joiner
           const existingPeers = [];
           room.forEach(socketId => {
@@ -118,7 +118,7 @@ export const setupSocketIO = (io) => {
               existingPeers.push(existingSocket.peerId);
             }
           });
-          
+
           if (existingPeers.length > 0) {
             // Send existing participants to new joiner
             setTimeout(() => {
@@ -126,7 +126,26 @@ export const setupSocketIO = (io) => {
               console.log(`Sent existing participants to ${peerId}:`, existingPeers);
             }, 1500);
           }
+          console.log('🌐 SERVER CONNECTION FLOW:', {
+            event: 'notifying_participants',
+            roomId: callId,
+            newPeerId: peerId,
+            existingPeers: existingPeers,
+            allRooms: Array.from(io.sockets.adapter.rooms.keys()).filter(r => !r.includes('#'))
+          });
         }
+
+        // Add to server/sockets/index.js near line 80 (in join-video-call handler)
+        console.log('🔄 SERVER SIGNALING DIAGNOSTICS:', {
+          event: 'join-video-call',
+          socketId: socket.id,
+          callId,
+          peerId,
+          roomExists: io.sockets.adapter.rooms.has(callId),
+          roomSize: io.sockets.adapter.rooms.get(callId)?.size || 0,
+          // Remove the reference to the undefined toUserId variable
+          socketUserId: socket.userId || 'none'
+        });
       } catch (error) {
         console.error(`Error joining video call ${callId}:`, error);
         socket.emit('video-call-error', { error: 'Failed to join call' });
@@ -145,7 +164,7 @@ export const setupSocketIO = (io) => {
     });
 
     // ====== RANDOM VIDEO CALL FUNCTIONALITY ======
-    
+
     // Join random video call
     socket.on('join-random-videocall', (roomId, peerId) => {
       console.log(`Socket ${socket.id} joining random video call ${roomId} with peer ID ${peerId}`);
@@ -173,9 +192,9 @@ export const setupSocketIO = (io) => {
     // Handle video call invitations
     socket.on('video-call-invitation', (data) => {
       const { callId, fromUserId, toUserId, fromUsername } = data;
-      
+
       console.log(`Video call invitation from ${fromUserId} to ${toUserId}`);
-      
+
       // Find the target user's socket using the helper function
       const targetSocket = findUserSocket(toUserId);
       if (targetSocket) {
@@ -198,7 +217,7 @@ export const setupSocketIO = (io) => {
     // Handle disconnection
     socket.on('disconnect', () => {
       console.log('User disconnected:', socket.id);
-      
+
       // If user was in a video call, notify others
       if (socket.currentCallId && socket.peerId) {
         socket.to(socket.currentCallId).emit('user-left-video-call', socket.peerId);
@@ -213,10 +232,10 @@ export const setupSocketIO = (io) => {
  * @param {Express} app - Express application instance
  */
 export const initializeSocketIO = (server, app) => {
-  const corsOrigins = process.env.ALLOWED_ORIGINS 
+  const corsOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',')
     : ['http://localhost:3000', 'https://smiya.onrender.com'];
-    
+
   const io = new Server(server, {
     cors: {
       origin: corsOrigins,
@@ -225,14 +244,14 @@ export const initializeSocketIO = (server, app) => {
     },
     transports: ['websocket', 'polling']
   });
-  
+
   console.log('🔌 Socket.IO configured with CORS origins:', corsOrigins);
-  
+
   // Store io instance in app for use in other parts of the application
   app.set('io', io);
-  
+
   // Setup socket handlers
   setupSocketIO(io);
-  
+
   return io;
 };
