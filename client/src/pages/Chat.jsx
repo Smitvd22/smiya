@@ -419,7 +419,8 @@ function Chat() {
       return;
     }
     
-    const callId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Make the callId more stable and consistent
+    const callId = `call_${friendId}_${getCurrentUser().id}`;
     console.log('Generated call ID:', callId);
     
     // Ensure socket is connected before sending invitation
@@ -440,7 +441,6 @@ function Chat() {
         fromUsername: currentUser.username
       });
       
-      // IMPORTANT: Clearly log that this user is the initiator
       console.log('🎭 ROLE ASSIGNMENT: User is INITIATOR of the call');
       
       // Navigate with clear initiator flag using React Router's state
@@ -471,7 +471,10 @@ function Chat() {
       );
       
       if (shouldJoin) {
-        // Use replace to prevent navigation stack issues - EXPLICITLY set isInitiator to false
+        // Make sure we use the exact same callId that was sent
+        console.log(`Accepting call with ID: ${callId}`);
+        
+        // Use replace to prevent navigation stack issues
         navigate(`/videocall/${callId}`, { 
           replace: true,
           state: {

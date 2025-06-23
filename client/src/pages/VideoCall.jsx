@@ -427,6 +427,15 @@ const VideoCall = () => {
             console.error('Error answering call:', err);
             setError(`Error answering call: ${err.message}`);
           }
+
+          // In VideoCall.jsx, after the peer answers a call
+          console.log('CONNECTION DEBUG:', {
+            localPeerID: myPeerId,
+            remotePeerID: call.peer,
+            callID: callId,
+            callObject: call,
+            connectionState: peerInstance.current._pc?.connectionState
+          });
         });
 
         // Step 5: Set up socket event handlers
@@ -443,13 +452,14 @@ const VideoCall = () => {
           
           // Log the role assignment clearly with the corrected role
           console.log(`👤 User joined: ${userId} (I am ${shouldInitiateCall ? 'INITIATOR' : 'RECEIVER'}, will ${shouldInitiateCall ? 'CALL' : 'WAIT FOR CALL'})`);
+          console.log(`My peer ID: ${myPeerId}, Remote peer ID: ${userId}`);
 
           // Only call if we're the initiator based on the corrected value
           if (shouldInitiateCall) {
             console.log('As initiator, calling peer:', userId);
             setConnectionStatus('calling');
 
-            // Short delay to ensure both peers are ready
+            // Add a slightly longer delay to ensure both peers are ready
             setTimeout(() => {
               if (!isComponentMounted.current || !peerInstance.current) return;
 
@@ -465,10 +475,18 @@ const VideoCall = () => {
                 }
 
                 currentCall.current = call;
+                
+                // Add debugging for call object
+                console.log('Call object created:', Object.keys(call));
 
                 call.on('stream', (remoteStream) => {
+                  console.log('✅ STREAM RECEIVED from remote peer!');
                   if (isComponentMounted.current && remoteVideo.current) {
                     console.log('✅ Received remote stream from outgoing call');
+                    console.log('Remote stream tracks:', {
+                      video: remoteStream.getVideoTracks().length,
+                      audio: remoteStream.getAudioTracks().length
+                    });
 
                     // Directly update UI when stream received
                     remoteVideo.current.srcObject = remoteStream;
@@ -483,6 +501,7 @@ const VideoCall = () => {
                   }
                 });
 
+                // Add more debugging for call events
                 call.on('close', () => {
                   console.log('Call ended by remote peer');
                   if (isComponentMounted.current) handleCallEnd();
@@ -490,7 +509,7 @@ const VideoCall = () => {
 
                 call.on('error', (err) => {
                   console.error('Call error:', err);
-                  // Don't set error state for non-fatal errors
+                  // Handle serious errors only
                   if (err.type !== 'peer-unavailable') {
                     setConnectionStatus('error');
                     setError(`Call failed: ${err.message}`);
@@ -499,8 +518,13 @@ const VideoCall = () => {
               } catch (err) {
                 console.error('Error initiating call:', err);
                 setError(`Error initiating call: ${err.message}`);
+                
+                // Try to reconnect after a brief delay
+                setTimeout(() => {
+                  if (isComponentMounted.current) handleRetry();
+                }, 3000);
               }
-            }, 1000); // Reduced delay for faster connection
+            }, 2000); // Increased delay for better reliability
           } else {
             console.log('As receiver, waiting for incoming call from:', userId);
             setConnectionStatus('waiting');
