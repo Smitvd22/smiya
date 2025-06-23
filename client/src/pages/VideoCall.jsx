@@ -134,6 +134,11 @@ const VideoCall = () => {
         console.warn('Error leaving video call room:', err);
       }
     }
+
+    // Clear session storage
+    if (callId) {
+      sessionStorage.removeItem(`isInitiator:${callId}`);
+    }
   }, [callId, getSocket]);
 
   const getPeerJSConfig = useCallback(() => {
@@ -149,7 +154,7 @@ const VideoCall = () => {
         config: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun1.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },  // Added "stun:" prefix
             { urls: 'stun:global.stun.twilio.com:3478' }
           ],
           // Add these for better connectivity
@@ -174,7 +179,7 @@ const VideoCall = () => {
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun1.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },  // Added "stun:" prefix
           { urls: 'stun:global.stun.twilio.com:3478' }
         ],
         iceCandidatePoolSize: 10,
@@ -192,6 +197,12 @@ const VideoCall = () => {
       return;
     }
     
+    // IMPORTANT: Check if we've previously initialized based on session storage
+    if (sessionStorage.getItem(`videoCallInitialized:${callId}`)) {
+      console.log('Found previous initialization in session storage, skipping redundant setup');
+      return;
+    }
+    
     console.log('🚀 Starting video call initialization...');
     setConnectionStatus('connecting');
 
@@ -199,6 +210,7 @@ const VideoCall = () => {
       try {
         // Set initialization flag
         hasInitialized.current = true;
+        sessionStorage.setItem(`videoCallInitialized:${callId}`, 'true');
         
         // Step 1: Get socket connection
         const socket = getSocket();
@@ -424,11 +436,16 @@ const VideoCall = () => {
             return;
           }
 
-          // Log the role assignment clearly
-          console.log(`👤 User joined: ${userId} (I am ${isInitiator ? 'INITIATOR' : 'RECEIVER'}, will ${isInitiator ? 'CALL' : 'WAIT FOR CALL'}`);
+          // FIXED: Preserve initiator role by getting the value from sessionStorage again
+          const storageKey = `isInitiator:${callId}`;
+          const storedRole = sessionStorage.getItem(storageKey);
+          const shouldInitiateCall = storedRole === 'true' || isInitiator;
+          
+          // Log the role assignment clearly with the corrected role
+          console.log(`👤 User joined: ${userId} (I am ${shouldInitiateCall ? 'INITIATOR' : 'RECEIVER'}, will ${shouldInitiateCall ? 'CALL' : 'WAIT FOR CALL'})`);
 
-          // Only call if we're the initiator
-          if (isInitiator) {
+          // Only call if we're the initiator based on the corrected value
+          if (shouldInitiateCall) {
             console.log('As initiator, calling peer:', userId);
             setConnectionStatus('calling');
 
@@ -734,7 +751,8 @@ const VideoCall = () => {
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      handleBeforeUnload(); // Cleanup on component unmount
+      // REMOVED: Don't call handleBeforeUnload() here
+      // This was causing premature cleanup during React StrictMode's test unmount
     };
   }, []);
 
@@ -742,14 +760,26 @@ const VideoCall = () => {
   useEffect(() => {
     if (!callId) return;
 
-    // Get role from location state (from Chat.jsx)
+    const storageKey = `isInitiator:${callId}`;
+
+    // 1. Check if location.state explicitly sets isInitiator
     if (location.state && typeof location.state.isInitiator === 'boolean') {
       setIsInitiator(location.state.isInitiator);
+      // Store in sessionStorage with a more reliable key format
+      sessionStorage.setItem(storageKey, location.state.isInitiator ? 'true' : 'false');
       console.log(`▶️ Role from Chat: ${location.state.isInitiator ? 'INITIATOR' : 'RECEIVER'}`);
     } else {
-      // Default to receiver if not specified
-      setIsInitiator(false);
-      console.log('▶️ Default role: RECEIVER (no override from Chat)');
+      // 2. If no location.state, check sessionStorage to see if we stored a role
+      const storedRole = sessionStorage.getItem(storageKey);
+      if (storedRole !== null) {
+        const boolVal = (storedRole === 'true');
+        setIsInitiator(boolVal);
+        console.log(`▶️ Restored role from sessionStorage: ${boolVal ? 'INITIATOR' : 'RECEIVER'}`);
+      } else {
+        // 3. Otherwise default to receiver
+        setIsInitiator(false);
+        console.log('▶️ Default role: RECEIVER (no override from Chat, none in storage)');
+      }
     }
   }, [callId, location.state]);
 
@@ -764,16 +794,30 @@ const VideoCall = () => {
       return;
     }
 
-    // Start initialization immediately
-    initializeVideoCall().catch(err => {
-      console.error('Initial connection failed:', err);
-    });
+    // IMPORTANT: Save initialization state to prevent repeated attempts
+    if (!sessionStorage.getItem(`videoCallMounted:${callId}`)) {
+      sessionStorage.setItem(`videoCallMounted:${callId}`, 'true');
+      
+      // Start initialization immediately
+      initializeVideoCall().catch(err => {
+        console.error('Initial connection failed:', err);
+      });
+    } else {
+      console.log('Component was remounted, continuing with existing setup');
+    }
 
     return () => {
       console.log('VideoCall component unmounting');
       isComponentMounted.current = false;
-      if (!hasCleanedUp.current) {
-        cleanup();
+      
+      // Only perform full cleanup when the component is truly being removed
+      if (process.env.NODE_ENV !== 'development') {
+        if (!hasCleanedUp.current) {
+          cleanup();
+        }
+      } else {
+        // In development, just log that we're skipping cleanup during unmount
+        console.log('Skipping full cleanup on unmount in development mode');
       }
     };
   }, [callId, cleanup, initializeVideoCall, navigate]);
