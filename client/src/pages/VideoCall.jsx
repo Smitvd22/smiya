@@ -35,6 +35,7 @@ const VideoCall = () => {
   const hasCleanedUp = useRef(false);
   const socketRef = useRef(null);
   const initializationPromise = useRef(null);
+  const remoteStreamRef = useRef(null); // NEW: Ref to store remote stream
 
   // Get or initialize socket
   const getSocket = useCallback(() => {
@@ -390,24 +391,33 @@ const VideoCall = () => {
 
             // Handle incoming stream
             call.on('stream', (remoteStream) => {
-              if (isComponentMounted.current && remoteVideo.current) {
-                console.log('✅ Received remote stream from incoming call');
-                console.log('Remote stream tracks:', {
-                  video: remoteStream.getVideoTracks().length,
-                  audio: remoteStream.getAudioTracks().length
-                });
-
-                // Update UI immediately when stream is received
-                remoteVideo.current.srcObject = remoteStream;
-                remoteVideo.current.play().catch(console.warn);
-
-                // Update connection status immediately
+              console.log('✅ Received remote stream from incoming call');
+              console.log('Remote stream tracks:', {
+                video: remoteStream.getVideoTracks().length,
+                audio: remoteStream.getAudioTracks().length
+              });
+              
+              if (isComponentMounted.current) {
+                // CRITICAL FIX: Update connection status immediately
                 setConnectionStatus('connected');
                 setIsLoading(false);
-
+                
+                // Store remote stream in a ref for later use
+                remoteStreamRef.current = remoteStream;
+                
                 // Set remote video state based on received tracks
                 const videoTracks = remoteStream.getVideoTracks();
                 setIsRemoteVideoEnabled(videoTracks.length > 0 && videoTracks[0].enabled);
+                
+                // Only try to set video element if ref exists
+                if (remoteVideo.current) {
+                  remoteVideo.current.srcObject = remoteStream;
+                  remoteVideo.current.play().catch(err => console.warn('Error playing remote video:', err));
+                } else {
+                  console.log('Remote video ref not ready yet, will be set in useEffect');
+                }
+              } else {
+                console.warn('Component not mounted, cannot handle stream');
               }
             });
 
@@ -436,6 +446,21 @@ const VideoCall = () => {
             callObject: call,
             connectionState: peerInstance.current._pc?.connectionState
           });
+
+          // Add this around line 480 in the call object creation section
+          if (call && call.peerConnection) {
+            call.peerConnection.addEventListener('connectionstatechange', () => {
+              console.log(`WebRTC connection state: ${call.peerConnection.connectionState}`);
+              if (call.peerConnection.connectionState === 'connected') {
+                // Ensure we update the status when WebRTC reports connected
+                setConnectionStatus('connected');
+              }
+            });
+            
+            call.peerConnection.addEventListener('iceconnectionstatechange', () => {
+              console.log(`ICE connection state: ${call.peerConnection.iceConnectionState}`);
+            });
+          }
         });
 
         // Step 5: Set up socket event handlers
@@ -488,20 +513,30 @@ const VideoCall = () => {
                     audio: remoteStream.getAudioTracks().length
                   });
                   
-                  if (isComponentMounted.current && remoteVideo.current) {
-                    console.log('Setting remote video source and updating state to connected');
-                    remoteVideo.current.srcObject = remoteStream;
-                    remoteVideo.current.play().catch(err => console.warn('Error playing remote video:', err));
-                    
+                  // Store the stream so we can use it later even if the ref isn't ready yet
+                  if (isComponentMounted.current) {
+                    // CRITICAL FIX: Update connection status regardless of ref
                     setConnectionStatus('connected');
                     setIsLoading(false);
                     
+                    // Store remote stream in a ref for later use
+                    if (!remoteStreamRef.current) {
+                      remoteStreamRef.current = remoteStream;
+                    }
+                    
+                    // Set remote video enabled state based on tracks
                     const videoTracks = remoteStream.getVideoTracks();
-                    const hasEnabledVideo = videoTracks.length > 0 && videoTracks[0].enabled;
-                    console.log('Remote video enabled:', hasEnabledVideo);
-                    setIsRemoteVideoEnabled(hasEnabledVideo);
+                    setIsRemoteVideoEnabled(videoTracks.length > 0 && videoTracks[0].enabled);
+                    
+                    // If ref is available, set it directly
+                    if (remoteVideo.current) {
+                      remoteVideo.current.srcObject = remoteStream;
+                      remoteVideo.current.play().catch(err => console.warn('Error playing remote video:', err));
+                    } else {
+                      console.log('Remote video ref not ready, will update in useEffect');
+                    }
                   } else {
-                    console.warn('Cannot set remote video: component unmounted or ref not available');
+                    console.warn('Component not mounted, cannot handle stream');
                   }
                 });
 
@@ -676,6 +711,28 @@ const VideoCall = () => {
     }
   };
 
+  // Add this function (around line 650 in the toggleVideo area)
+  const updateRemoteTrackState = () => {
+    if (currentCall.current && currentCall.current.peerConnection) {
+      const senders = currentCall.current.peerConnection.getSenders();
+      const videoSender = senders.find(sender => sender.track?.kind === 'video');
+      
+      if (videoSender && videoSender.track) {
+        // Notify the other side about track state changes
+        console.log(`Notifying peer that video is now ${videoSender.track.enabled ? 'enabled' : 'disabled'}`);
+        
+        // Send a data channel message if possible
+        if (currentCall.current.dataChannel && 
+            currentCall.current.dataChannel.readyState === 'open') {
+          currentCall.current.dataChannel.send(JSON.stringify({
+            type: 'video-state',
+            enabled: videoSender.track.enabled
+          }));
+        }
+      }
+    }
+  };
+
   const toggleAudio = () => {
     if (!hasAudioPermission) {
       navigator.mediaDevices.getUserMedia({ audio: true })
@@ -822,22 +879,30 @@ const VideoCall = () => {
       return;
     }
 
-    // IMPORTANT: Save initialization state to prevent repeated attempts
+    // IMPORTANT: Prevent race conditions with better mounting logic
     if (!sessionStorage.getItem(`videoCallMounted:${callId}`)) {
       sessionStorage.setItem(`videoCallMounted:${callId}`, 'true');
-
+      
       // Start initialization immediately
       initializeVideoCall().catch(err => {
         console.error('Initial connection failed:', err);
       });
     } else {
       console.log('Component was remounted, continuing with existing setup');
+      
+      // IMPORTANT: When remounting, check if we already have connection details
+      // and restore them to avoid reinitializing everything
+      if (connectionStatus === 'connected' && remoteStreamRef.current && remoteVideo.current) {
+        console.log('Restoring video stream on remount');
+        remoteVideo.current.srcObject = remoteStreamRef.current;
+        remoteVideo.current.play().catch(console.warn);
+      }
     }
 
     return () => {
       console.log('VideoCall component unmounting');
       isComponentMounted.current = false;
-
+      
       // Only perform full cleanup when the component is truly being removed
       if (process.env.NODE_ENV !== 'development') {
         if (!hasCleanedUp.current) {
@@ -848,7 +913,7 @@ const VideoCall = () => {
         console.log('Skipping full cleanup on unmount in development mode');
       }
     };
-  }, [callId, cleanup, initializeVideoCall, navigate]);
+  }, [callId, cleanup, initializeVideoCall, navigate, connectionStatus]);
 
   // Update video element handling
   useEffect(() => {
@@ -862,28 +927,52 @@ const VideoCall = () => {
     }
   }, [hasVideoPermission, isVideoEnabled]);
 
-  // Add this effect to help debug track changes
+  // Update the track change effect (around line 865)
   useEffect(() => {
     if (remoteVideo.current && remoteVideo.current.srcObject) {
       const stream = remoteVideo.current.srcObject;
       
       const trackHandler = (event) => {
         console.log('Remote track state changed:', event.type);
-        const videoTracks = stream.getVideoTracks();
+        updateRemoteVideoState(stream);
+      };
+      
+      const trackEnabledHandler = () => {
+        console.log('Track enabled/disabled event');
+        updateRemoteVideoState(stream);
+      };
+      
+      // Helper function to update remote video state
+      const updateRemoteVideoState = (s) => {
+        const videoTracks = s.getVideoTracks();
         const hasEnabledVideo = videoTracks.length > 0 && videoTracks[0].enabled;
         console.log('Remote video enabled after change:', hasEnabledVideo);
         setIsRemoteVideoEnabled(hasEnabledVideo);
       };
       
+      // Listen for track changes
       stream.addEventListener('addtrack', trackHandler);
       stream.addEventListener('removetrack', trackHandler);
+      
+      // Also monitor each track's enabled state
+      stream.getTracks().forEach(track => {
+        track.addEventListener('ended', trackEnabledHandler);
+        track.addEventListener('mute', trackEnabledHandler);
+        track.addEventListener('unmute', trackEnabledHandler);
+      });
       
       return () => {
         stream.removeEventListener('addtrack', trackHandler);
         stream.removeEventListener('removetrack', trackHandler);
+        
+        stream.getTracks().forEach(track => {
+          track.removeEventListener('ended', trackEnabledHandler);
+          track.removeEventListener('mute', trackEnabledHandler);
+          track.removeEventListener('unmute', trackEnabledHandler);
+        });
       };
     }
-  }, [connectionStatus]);
+  }, [connectionStatus, remoteVideo.current?.srcObject]);
 
   // Loading state
   if (isLoading) {
@@ -1012,21 +1101,27 @@ const VideoCall = () => {
         {/* Remote video */}
         <div className="video-container remote-video">
           {connectionStatus === 'connected' ? (
-            isRemoteVideoEnabled ? (
+            <>
               <video
                 ref={remoteVideo}
                 autoPlay
                 playsInline
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                style={{ 
+                  width: '100%', 
+                  height: '100%', 
+                  objectFit: 'cover',
+                  display: isRemoteVideoEnabled ? 'block' : 'none' 
+                }}
               />
-            ) : (
-              <div className="video-placeholder black-screen">
-                <div className="placeholder-content">
-                  <span className="placeholder-icon">👤</span>
-                  <p>Remote User (Camera Off)</p>
+              {!isRemoteVideoEnabled && (
+                <div className="video-placeholder black-screen">
+                  <div className="placeholder-content">
+                    <span className="placeholder-icon">👤</span>
+                    <p>Remote User (Camera Off)</p>
+                  </div>
                 </div>
-              </div>
-            )
+              )}
+            </>
           ) : (
             <div className="video-placeholder">
               <div className="placeholder-content">
@@ -1042,7 +1137,9 @@ const VideoCall = () => {
             </div>
           )}
           <div className="video-label">
-            {connectionStatus === 'connected' && !isRemoteVideoEnabled ? 'Remote User (Camera Off)' : 'Remote User'}
+            {connectionStatus === 'connected' 
+              ? (isRemoteVideoEnabled ? 'Remote User' : 'Remote User (Camera Off)')
+              : 'Remote User'}
           </div>
         </div>
       </div>
