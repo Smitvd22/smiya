@@ -635,6 +635,7 @@ const VideoCall = () => {
   // Enhanced toggle video function
   const toggleVideo = () => {
     if (!hasVideoPermission) {
+      // This part is fine - handles initial permission request
       navigator.mediaDevices.getUserMedia({ video: true })
         .then(stream => {
           const videoTrack = stream.getVideoTracks()[0];
@@ -673,39 +674,83 @@ const VideoCall = () => {
       return;
     }
 
+    // Modified part to handle turning video back on
     if (myStream.current) {
-      const videoTrack = myStream.current.getVideoTracks()[0];
-      if (videoTrack) {
-        if (!videoTrack.enabled) {
-          // Turning video ON
-          videoTrack.enabled = true;
-          setIsVideoEnabled(true);
-
-          if (myVideo.current) {
-            myVideo.current.srcObject = myStream.current;
-            myVideo.current.play().catch(console.warn);
-          }
-        } else {
-          // Turning video OFF - STOP the track completely
-          videoTrack.enabled = false;
-          videoTrack.stop(); // Actually stop the camera
-          myStream.current.removeTrack(videoTrack); // Remove from stream
-          setIsVideoEnabled(false);
-
-          // Clear video element
-          if (myVideo.current) {
-            myVideo.current.srcObject = null;
-            myVideo.current.src = '';
-          }
-
-          // Update peer connection
-          if (currentCall.current && currentCall.current.peerConnection) {
-            currentCall.current.peerConnection.getSenders().forEach(sender => {
-              if (sender.track && sender.track.kind === 'video') {
-                sender.replaceTrack(null); // Remove video track from peer
+      const videoTracks = myStream.current.getVideoTracks();
+      
+      // If no video tracks or they're disabled
+      if (videoTracks.length === 0 || !videoTracks[0].enabled) {
+        // Request a new video track
+        navigator.mediaDevices.getUserMedia({ video: true })
+          .then(stream => {
+            const newVideoTrack = stream.getVideoTracks()[0];
+            
+            // Add the new track to our existing stream
+            myStream.current.addTrack(newVideoTrack);
+            setIsVideoEnabled(true);
+            
+            // Update video element
+            if (myVideo.current) {
+              myVideo.current.srcObject = myStream.current;
+              myVideo.current.play().catch(console.warn);
+            }
+            
+            // Update peer connection with new stream
+            if (currentCall.current && currentCall.current.peerConnection) {
+              currentCall.current.peerConnection.getSenders().forEach(sender => {
+                if (sender.track && sender.track.kind === 'video') {
+                  sender.replaceTrack(newVideoTrack);
+                } else if (!sender.track && sender.kind === 'video') {
+                  // If no track but sender is for video
+                  sender.replaceTrack(newVideoTrack);
+                }
+              });
+              
+              // If no video sender exists, add one
+              const hasVideoSender = currentCall.current.peerConnection.getSenders()
+                .some(sender => sender.track?.kind === 'video');
+                
+              if (!hasVideoSender) {
+                currentCall.current.peerConnection.addTrack(newVideoTrack, myStream.current);
+              }
+            }
+          })
+          .catch(err => {
+            console.error('Failed to get video stream:', err);
+            setError('Could not enable camera');
+          });
+      } else {
+        // Turn OFF logic - improved signaling to remote peer
+        const videoTrack = videoTracks[0];
+        videoTrack.enabled = false; // First disable the track
+        
+        // Signal to remote peer that video is off BEFORE stopping the track
+        if (currentCall.current && currentCall.current.peerConnection) {
+          // Find video sender and disable it
+          const videoSenders = currentCall.current.peerConnection.getSenders()
+            .filter(sender => sender.track && sender.track.kind === 'video');
+            
+          if (videoSenders.length > 0) {
+            // Option 1: Mute the track but keep it (better for resuming)
+            videoSenders.forEach(sender => {
+              if (sender.track) {
+                sender.track.enabled = false;
               }
             });
+            
+            // Option 2: Or replace with null track
+            // videoSenders.forEach(sender => sender.replaceTrack(null));
           }
+        }
+        
+        // After signaling, stop the track
+        videoTrack.stop();
+        myStream.current.removeTrack(videoTrack);
+        setIsVideoEnabled(false);
+        
+        // Clear video element
+        if (myVideo.current) {
+          myVideo.current.srcObject = myStream.current;
         }
       }
     }
@@ -974,6 +1019,51 @@ const VideoCall = () => {
     }
   }, [connectionStatus, remoteVideo.current?.srcObject]);
 
+  // Enhanced remote track state detection
+  useEffect(() => {
+    if (!remoteVideo.current || !remoteVideo.current.srcObject) return;
+    
+    const checkRemoteVideoState = () => {
+      const stream = remoteVideo.current.srcObject;
+      const videoTracks = stream.getVideoTracks();
+      
+      // Check if we have active video tracks
+      const hasActiveVideo = videoTracks.length > 0 && 
+        videoTracks.some(track => track.enabled && track.readyState === 'live');
+      
+      console.log('Remote video state check:', {
+        hasActiveVideo,
+        tracksCount: videoTracks.length,
+        tracksEnabled: videoTracks.map(t => t.enabled),
+        tracksState: videoTracks.map(t => t.readyState)
+      });
+      
+      // Update state based on active video
+      setIsRemoteVideoEnabled(hasActiveVideo);
+    };
+    
+    // Check immediately
+    checkRemoteVideoState();
+    
+    // Set up interval to periodically check
+    const checkInterval = setInterval(checkRemoteVideoState, 2000);
+    
+    // Set up event listeners
+    const stream = remoteVideo.current.srcObject;
+    const handleTrackEvent = () => checkRemoteVideoState();
+    
+    stream.addEventListener('addtrack', handleTrackEvent);
+    stream.addEventListener('removetrack', handleTrackEvent);
+    
+    return () => {
+      clearInterval(checkInterval);
+      if (stream) {
+        stream.removeEventListener('addtrack', handleTrackEvent);
+        stream.removeEventListener('removetrack', handleTrackEvent);
+      }
+    };
+  }, [remoteVideo.current?.srcObject]);
+
   // Loading state
   if (isLoading) {
     return (
@@ -1112,6 +1202,7 @@ const VideoCall = () => {
                   objectFit: 'cover',
                   display: isRemoteVideoEnabled ? 'block' : 'none' 
                 }}
+                onEmptied={() => setIsRemoteVideoEnabled(false)}
               />
               {!isRemoteVideoEnabled && (
                 <div className="video-placeholder black-screen">
