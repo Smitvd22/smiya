@@ -190,7 +190,42 @@ const VideoCall = () => {
     };
   }, []);
 
-  // FIXED: Completely rewritten initialization logic
+  // 1. First, declare initializeVideoCall using useRef to break the circular dependency
+  const initializeVideoCallRef = useRef(null);
+
+  // 2. Then define handleRetry using the ref
+  const handleRetry = useCallback(() => {
+    console.log('🔄 Manual retry initiated');
+
+    // Force cleanup first with better media resource management
+    cleanup();
+
+    // Wait longer before retry to ensure resources are fully released
+    setTimeout(() => {
+      // Reset initialization state
+      hasInitialized.current = false;
+      hasCleanedUp.current = false;
+      initializationPromise.current = null;
+
+      // Reset state
+      setIsLoading(true);
+      setError('');
+      setConnectionStatus('connecting');
+
+      // Preserve permissions state to avoid unnecessary permission requests
+      // but reset active state
+      setIsVideoEnabled(false);
+      setIsAudioEnabled(false);
+      setIsRemoteVideoEnabled(false);
+
+      // Delay the new initialization to allow resources to be fully released
+      setTimeout(() => {
+        initializeVideoCallRef.current();
+      }, 2000);
+    }, 1000);
+  }, [cleanup]);
+
+  // 3. Then define the actual function and assign it to the ref
   const initializeVideoCall = useCallback(async () => {
     // Don't initialize if we've already done so or cleanup has occurred
     if (hasInitialized.current || hasCleanedUp.current) {
@@ -618,7 +653,12 @@ const VideoCall = () => {
     })();
 
     return initializationPromise.current;
-  }, [callId, getPeerJSConfig, handleCallEnd, getSocket, isInitiator]);
+  }, [callId, getPeerJSConfig, handleCallEnd, getSocket, isInitiator, myPeerId, setParticipants, handleRetry]);
+
+  // 4. Set the ref to point to the actual function
+  useEffect(() => {
+    initializeVideoCallRef.current = initializeVideoCall;
+  }, [initializeVideoCall]);
 
   // Add to VideoCall.jsx after any connectionStatus change
   useEffect(() => {
@@ -756,27 +796,27 @@ const VideoCall = () => {
     }
   };
 
-  // Add this function (around line 650 in the toggleVideo area)
-  const updateRemoteTrackState = () => {
-    if (currentCall.current && currentCall.current.peerConnection) {
-      const senders = currentCall.current.peerConnection.getSenders();
-      const videoSender = senders.find(sender => sender.track?.kind === 'video');
+  // // Add this function (around line 650 in the toggleVideo area)
+  // const updateRemoteTrackState = () => {
+  //   if (currentCall.current && currentCall.current.peerConnection) {
+  //     const senders = currentCall.current.peerConnection.getSenders();
+  //     const videoSender = senders.find(sender => sender.track?.kind === 'video');
       
-      if (videoSender && videoSender.track) {
-        // Notify the other side about track state changes
-        console.log(`Notifying peer that video is now ${videoSender.track.enabled ? 'enabled' : 'disabled'}`);
+  //     if (videoSender && videoSender.track) {
+  //       // Notify the other side about track state changes
+  //       console.log(`Notifying peer that video is now ${videoSender.track.enabled ? 'enabled' : 'disabled'}`);
         
-        // Send a data channel message if possible
-        if (currentCall.current.dataChannel && 
-            currentCall.current.dataChannel.readyState === 'open') {
-          currentCall.current.dataChannel.send(JSON.stringify({
-            type: 'video-state',
-            enabled: videoSender.track.enabled
-          }));
-        }
-      }
-    }
-  };
+  //       // Send a data channel message if possible
+  //       if (currentCall.current.dataChannel && 
+  //           currentCall.current.dataChannel.readyState === 'open') {
+  //         currentCall.current.dataChannel.send(JSON.stringify({
+  //           type: 'video-state',
+  //           enabled: videoSender.track.enabled
+  //         }));
+  //       }
+  //     }
+  //   }
+  // };
 
   const toggleAudio = () => {
     if (!hasAudioPermission) {
@@ -811,38 +851,6 @@ const VideoCall = () => {
     cleanup();
     navigate(-1);
   };
-
-  // Move the handleRetry function up, before the useEffect that uses it
-  const handleRetry = useCallback(() => {
-    console.log('🔄 Manual retry initiated');
-
-    // Force cleanup first with better media resource management
-    cleanup();
-
-    // Wait longer before retry to ensure resources are fully released
-    setTimeout(() => {
-      // Reset initialization state
-      hasInitialized.current = false;
-      hasCleanedUp.current = false;
-      initializationPromise.current = null;
-
-      // Reset state
-      setIsLoading(true);
-      setError('');
-      setConnectionStatus('connecting');
-
-      // Preserve permissions state to avoid unnecessary permission requests
-      // but reset active state
-      setIsVideoEnabled(false);
-      setIsAudioEnabled(false);
-      setIsRemoteVideoEnabled(false);
-
-      // Delay the new initialization to allow resources to be fully released
-      setTimeout(() => {
-        initializeVideoCall();
-      }, 2000);
-    }, 1000);
-  }, [cleanup, initializeVideoCall]);
 
   // Increase timeout for connection establishment
   useEffect(() => {
@@ -1259,6 +1267,16 @@ const VideoCall = () => {
         <button onClick={endCall} className="control-btn end-call">
           📞 End Call
         </button>
+      </div>
+
+      {/* Participants list - NEW SECTION */}
+      <div className="participants-list">
+        <h3>Participants ({participants.length})</h3>
+        <ul>
+          {participants.map((participantId, index) => (
+            <li key={index}>{participantId === myPeerId ? 'You' : participantId}</li>
+          ))}
+        </ul>
       </div>
 
       {/* Debug info - shows myPeerId in development mode */}
