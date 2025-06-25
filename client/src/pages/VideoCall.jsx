@@ -134,11 +134,18 @@ const VideoCall = () => {
       } catch (err) {
         console.warn('Error leaving video call room:', err);
       }
-    }
-
-    // Clear session storage
+    }    // Clear session storage
     if (callId) {
       sessionStorage.removeItem(`isInitiator:${callId}`);
+      sessionStorage.removeItem(`videoCallInitialized:${callId}`);
+      sessionStorage.removeItem(`videoCallMounted:${callId}`);
+      
+      // Clear all processing flags for this call
+      Object.keys(sessionStorage).forEach(key => {
+        if (key.startsWith(`processed_user_${callId}_`)) {
+          sessionStorage.removeItem(key);
+        }
+      });
     }
   }, [callId, getSocket]);
 
@@ -496,23 +503,35 @@ const VideoCall = () => {
               console.log(`ICE connection state: ${call.peerConnection.iceConnectionState}`);
             });
           }
-        });
-
-        // Step 5: Set up socket event handlers
+        });        // Step 5: Set up socket event handlers
         const handleUserJoined = (userId) => {
           if (!isComponentMounted.current || !peerInstance.current || userId === myPeerId) {
             console.log('Ignoring user joined event:', { userId, myPeerId });
             return;
           }
 
-          // FIXED: Preserve initiator role by getting the value from sessionStorage again
+          // CRITICAL FIX: Always use sessionStorage as the source of truth for role
           const storageKey = `isInitiator:${callId}`;
           const storedRole = sessionStorage.getItem(storageKey);
-          const shouldInitiateCall = storedRole === 'true' || isInitiator;
+          
+          // Prevent duplicate processing of the same user during remounts
+          const processedKey = `processed_user_${callId}_${userId}`;
+          if (sessionStorage.getItem(processedKey)) {
+            console.log(`User ${userId} already processed for call ${callId}, skipping...`);
+            return;
+          }
+          
+          // Only use storedRole if it exists, don't fall back to isInitiator state
+          // because state might be reset during remounts
+          const shouldInitiateCall = storedRole === 'true';
+
+          // Mark this user as processed to prevent duplicate calls during remounts
+          sessionStorage.setItem(processedKey, 'true');
 
           // Log the role assignment clearly with the corrected role
           console.log(`👤 User joined: ${userId} (I am ${shouldInitiateCall ? 'INITIATOR' : 'RECEIVER'}, will ${shouldInitiateCall ? 'CALL' : 'WAIT FOR CALL'})`);
           console.log(`My peer ID: ${myPeerId}, Remote peer ID: ${userId}`);
+          console.log(`Role determination: storedRole="${storedRole}", isInitiator=${isInitiator}, shouldInitiateCall=${shouldInitiateCall}`);
 
           // Only call if we're the initiator based on the corrected value
           if (shouldInitiateCall) {
@@ -893,7 +912,6 @@ const VideoCall = () => {
       // This was causing premature cleanup during React StrictMode's test unmount
     };
   }, []);
-
   // Use location state to get isInitiator - KEY FIX
   useEffect(() => {
     if (!callId) return;
@@ -906,16 +924,18 @@ const VideoCall = () => {
       // Store in sessionStorage with a more reliable key format
       sessionStorage.setItem(storageKey, location.state.isInitiator ? 'true' : 'false');
       console.log(`▶️ Role from Chat: ${location.state.isInitiator ? 'INITIATOR' : 'RECEIVER'}`);
+      console.log(`▶️ Stored in sessionStorage: ${storageKey}=${location.state.isInitiator ? 'true' : 'false'}`);
     } else {
       // 2. If no location.state, check sessionStorage to see if we stored a role
       const storedRole = sessionStorage.getItem(storageKey);
       if (storedRole !== null) {
         const boolVal = (storedRole === 'true');
         setIsInitiator(boolVal);
-        console.log(`▶️ Restored role from sessionStorage: ${boolVal ? 'INITIATOR' : 'RECEIVER'}`);
+        console.log(`▶️ Restored role from sessionStorage: ${boolVal ? 'INITIATOR' : 'RECEIVER'} (stored value: "${storedRole}")`);
       } else {
         // 3. Otherwise default to receiver
         setIsInitiator(false);
+        sessionStorage.setItem(storageKey, 'false');
         console.log('▶️ Default role: RECEIVER (no override from Chat, none in storage)');
       }
     }
