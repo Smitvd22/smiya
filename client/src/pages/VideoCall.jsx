@@ -71,8 +71,8 @@ const VideoCall = () => {
   }, []);
 
   // Cleanup function to be more resilient
-  const cleanup = useCallback(() => {
-    console.log('Cleaning up video call...');
+  const cleanup = useCallback((fullCleanup = false) => {
+    console.log('Cleaning up video call...', fullCleanup ? '(full cleanup)' : '(partial cleanup)');
 
     // Set flag to prevent re-initialization right after cleanup
     hasCleanedUp.current = true;
@@ -134,8 +134,10 @@ const VideoCall = () => {
       } catch (err) {
         console.warn('Error leaving video call room:', err);
       }
-    }    // Clear session storage
-    if (callId) {
+    }
+    
+    // Only clear ALL session storage during full cleanup (when intentionally ending call)
+    if (fullCleanup && callId) {
       sessionStorage.removeItem(`isInitiator:${callId}`);
       sessionStorage.removeItem(`videoCallInitialized:${callId}`);
       sessionStorage.removeItem(`videoCallMounted:${callId}`);
@@ -146,6 +148,13 @@ const VideoCall = () => {
           sessionStorage.removeItem(key);
         }
       });
+    } else {
+      // For partial cleanup (during remounts), only clear initialization flags
+      // but PRESERVE the role information
+      if (callId) {
+        sessionStorage.removeItem(`videoCallInitialized:${callId}`);
+        // Don't remove isInitiator value
+      }
     }
   }, [callId, getSocket]);
 
@@ -205,7 +214,8 @@ const VideoCall = () => {
     console.log('🔄 Manual retry initiated');
 
     // Force cleanup first with better media resource management
-    cleanup();
+    // but do partial cleanup to preserve role
+    cleanup(false);
 
     // Wait longer before retry to ensure resources are fully released
     setTimeout(() => {
@@ -867,7 +877,7 @@ const VideoCall = () => {
   };
 
   const endCall = () => {
-    cleanup();
+    cleanup(true); // Pass true for full cleanup
     navigate(-1);
   };
 
@@ -976,10 +986,11 @@ const VideoCall = () => {
       console.log('VideoCall component unmounting');
       isComponentMounted.current = false;
       
-      // Only perform full cleanup when the component is truly being removed
+      // Only perform partial cleanup when the component is unmounting 
+      // but not full cleanup that would remove role information
       if (process.env.NODE_ENV !== 'development') {
         if (!hasCleanedUp.current) {
-          cleanup();
+          cleanup(false); // Pass false for partial cleanup
         }
       } else {
         // In development, just log that we're skipping cleanup during unmount
