@@ -12,6 +12,8 @@ import { CallProvider } from './contexts/CallContext';
 import './App.css';
 import './styles/LoveTheme.css';
 import VideoCall from './pages/VideoCall';
+import LandingPage from './pages/LandingPage';
+import PreviousYear from './pages/PreviousYear'; // Import the PreviousYear component
 
 function App() {
   // Function to check if user is authenticated
@@ -46,7 +48,7 @@ function App() {
           <Navbar />
           <Routes>
             {/* Public routes */}
-            <Route path="/" element={<Home />} />
+            <Route path="/home" element={<Home />} />
             <Route
               path="/login"
               element={isAuthenticated() ? <Navigate to="/friends" /> : <Login />}
@@ -56,6 +58,8 @@ function App() {
               element={isAuthenticated() ? <Navigate to="/friends" /> : <Register />}
             />
             <Route path="/birthday" element={<BirthdayWish />} />
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/previous-year" element={<PreviousYear />} /> {/* Add the PreviousYear route */}
 
             {/* Protected routes */}
             <Route

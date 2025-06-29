@@ -73,13 +73,13 @@ const Navbar = () => {
     
     // Force a complete page refresh when navigating to homepage
     // This ensures all components are freshly mounted
-    window.location.href = '/';
+    window.location.href = '/home';
   };
 
   return (
     <nav className={`navbar ${showNavbar ? 'navbar-visible' : 'navbar-hidden'}`}>
       <div className="navbar-container">
-        <Link to="/" className="navbar-logo">
+        <Link to="/home" className="navbar-logo">
           Smiya
         </Link>
         

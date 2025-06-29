@@ -158,10 +158,9 @@ const VideoCall = () => {
     }
   }, [callId, getSocket]);
 
+  // Enhance ICE servers for better production connectivity
   const getPeerJSConfig = useCallback(() => {
-    const isProduction = process.env.NODE_ENV === 'production';
-
-    if (isProduction) {
+    if (process.env.NODE_ENV === 'production') {
       return {
         host: '0.peerjs.com',
         port: 443,
@@ -171,17 +170,31 @@ const VideoCall = () => {
         config: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },  // Added "stun:" prefix
-            { urls: 'stun:global.stun.twilio.com:3478' }
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' },
+            { urls: 'stun:global.stun.twilio.com:3478' },
+            // Add free TURN servers if available
+            {
+              urls: 'turn:openrelay.metered.ca:80',
+              username: 'openrelayproject',
+              credential: 'openrelayproject'
+            },
+            {
+              urls: 'turn:openrelay.metered.ca:443',
+              username: 'openrelayproject',
+              credential: 'openrelayproject'
+            }
           ],
-          // Add these for better connectivity
           iceCandidatePoolSize: 10,
           bundlePolicy: 'max-bundle',
           rtcpMuxPolicy: 'require'
         }
       };
     }
-
+    
+    // Rest of your development config...
     const host = process.env.REACT_APP_PEERJS_HOST || 'localhost';
     const port = parseInt(process.env.REACT_APP_PEERJS_PORT) || 9000;
     const path = process.env.REACT_APP_PEERJS_PATH || '/peerjs';
@@ -212,35 +225,39 @@ const VideoCall = () => {
   // 2. Then define handleRetry using the ref
   const handleRetry = useCallback(() => {
     console.log('🔄 Manual retry initiated');
+    
+    // Set a flag to prevent cleanup from navigation
+    window.isIntentionalNavigation = false;
 
-    // Force cleanup first with better media resource management
-    // but do partial cleanup to preserve role
+    // Force cleanup first
     cleanup(false);
 
-    // Wait longer before retry to ensure resources are fully released
+    // Wait longer to ensure resources are released
     setTimeout(() => {
       // Reset initialization state
       hasInitialized.current = false;
       hasCleanedUp.current = false;
       initializationPromise.current = null;
+      
+      // Clear initialization flag in session storage
+      sessionStorage.removeItem(`videoCallInitialized:${callId}`);
 
       // Reset state
       setIsLoading(true);
       setError('');
       setConnectionStatus('connecting');
 
-      // Preserve permissions state to avoid unnecessary permission requests
-      // but reset active state
+      // Preserve permissions state but reset active state
       setIsVideoEnabled(false);
       setIsAudioEnabled(false);
       setIsRemoteVideoEnabled(false);
 
-      // Delay the new initialization to allow resources to be fully released
+      // Delay new initialization to allow resources to be fully released
       setTimeout(() => {
         initializeVideoCallRef.current();
       }, 2000);
     }, 1000);
-  }, [cleanup]);
+  }, [cleanup, callId]);
 
   // 3. Then define the actual function and assign it to the ref
   const initializeVideoCall = useCallback(async () => {
@@ -397,6 +414,10 @@ const VideoCall = () => {
           peer.on('open', (id) => {
             clearTimeout(timeout);
             console.log('✅ PeerJS connected with ID:', id);
+            
+            // CRITICAL FIX: Store peer ID in session storage to survive remounts
+            sessionStorage.setItem(`peerId:${callId}`, id);
+            
             setMyPeerId(id);
             resolve(id);
           });
@@ -881,20 +902,46 @@ const VideoCall = () => {
     navigate(-1);
   };
 
-  // Increase timeout for connection establishment
+  // Increase timeout and add progressive retry
   useEffect(() => {
     let connectionTimeout;
 
     if (connectionStatus === 'calling' || connectionStatus === 'connecting') {
-      connectionTimeout = setTimeout(() => {
-        if (connectionStatus !== 'connected' && isComponentMounted.current) {
-          console.warn('Connection timeout, retrying...');
-          setError('Connection timeout. Retrying...');
-
-          // Attempt retry
-          handleRetry();
-        }
-      }, 30000); // Increase from 15 to 30 seconds
+      // Progressive timeouts with multiple retries
+      const attemptRetry = (attempt = 1) => {
+        const timeout = 15000 + (attempt * 5000); // Increase timeout with each attempt
+        
+        console.log(`Setting connection timeout #${attempt} for ${timeout}ms`);
+        connectionTimeout = setTimeout(() => {
+          if (connectionStatus !== 'connected' && isComponentMounted.current) {
+            console.warn(`Connection timeout #${attempt}, retrying...`);
+            
+            if (attempt < 3) {
+              // Just retry the peer connection without full cleanup
+              if (peerInstance.current) {
+                // Reconnect just the peer
+                console.log('Attempting to reconnect peer without full cleanup');
+                
+                // Notify the user
+                setError(`Connection attempt #${attempt} timed out. Retrying...`);
+                
+                // Start next attempt
+                attemptRetry(attempt + 1);
+              } else {
+                // If no peer instance, do a full retry
+                handleRetry();
+              }
+            } else {
+              // After 3 attempts, do a full retry
+              setError('Connection timed out after multiple attempts. Trying one last time...');
+              handleRetry();
+            }
+          }
+        }, timeout);
+      };
+      
+      // Start first attempt
+      attemptRetry();
     }
 
     return () => {
@@ -904,22 +951,30 @@ const VideoCall = () => {
 
   // Enhanced beforeunload handler
   useEffect(() => {
-    const handleBeforeUnload = () => {
+    // Flag to track intentional navigation
+    window.isIntentionalNavigation = false;
+    
+    const handleBeforeUnload = (e) => {
       console.log('Page unloading, cleaning up media...');
+      // Set intentional navigation flag
+      window.isIntentionalNavigation = true;
+      
       if (myStream.current) {
         myStream.current.getTracks().forEach(track => {
           track.stop();
           track.enabled = false;
         });
       }
+      
+      // For some browsers, we need to return a message
+      e.returnValue = '';
+      return '';
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
-
+    
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      // REMOVED: Don't call handleBeforeUnload() here
-      // This was causing premature cleanup during React StrictMode's test unmount
     };
   }, []);
   // Use location state to get isInitiator - KEY FIX
@@ -962,19 +1017,33 @@ const VideoCall = () => {
       return;
     }
 
-    // IMPORTANT: Prevent race conditions with better mounting logic
-    if (!sessionStorage.getItem(`videoCallMounted:${callId}`)) {
-      sessionStorage.setItem(`videoCallMounted:${callId}`, 'true');
+    // CRITICAL FIX: Prevent multiple initializations with better mounting check
+    const mountKey = `videoCallMounted:${callId}`;
+    const initKey = `videoCallInitialized:${callId}`;
+    
+    // Only initialize if not already done
+    if (!sessionStorage.getItem(mountKey) || !sessionStorage.getItem(initKey)) {
+      sessionStorage.setItem(mountKey, 'true');
       
-      // Start initialization immediately
-      initializeVideoCall().catch(err => {
-        console.error('Initial connection failed:', err);
-      });
+      // Start initialization immediately, but don't reinitialize if already done
+      if (!sessionStorage.getItem(initKey)) {
+        initializeVideoCall().catch(err => {
+          console.error('Initial connection failed:', err);
+          setError(`Connection failed: ${err.message}`);
+        });
+      }
     } else {
       console.log('Component was remounted, continuing with existing setup');
       
-      // IMPORTANT: When remounting, check if we already have connection details
-      // and restore them to avoid reinitializing everything
+      // CRITICAL FIX: Restore myPeerId from session storage on remount
+      const peerIdKey = `peerId:${callId}`;
+      const storedPeerId = sessionStorage.getItem(peerIdKey);
+      if (storedPeerId && !myPeerId) {
+        console.log('Restoring peer ID from session storage:', storedPeerId);
+        setMyPeerId(storedPeerId);
+      }
+      
+      // Restore remote stream if available
       if (connectionStatus === 'connected' && remoteStreamRef.current && remoteVideo.current) {
         console.log('Restoring video stream on remount');
         remoteVideo.current.srcObject = remoteStreamRef.current;
@@ -986,18 +1055,12 @@ const VideoCall = () => {
       console.log('VideoCall component unmounting');
       isComponentMounted.current = false;
       
-      // Only perform partial cleanup when the component is unmounting 
-      // but not full cleanup that would remove role information
-      if (process.env.NODE_ENV !== 'development') {
-        if (!hasCleanedUp.current) {
-          cleanup(false); // Pass false for partial cleanup
-        }
-      } else {
-        // In development, just log that we're skipping cleanup during unmount
-        console.log('Skipping full cleanup on unmount in development mode');
+      // Only perform cleanup when intentionally navigating away
+      if (window.isIntentionalNavigation) {
+        cleanup(true);
       }
     };
-  }, [callId, cleanup, initializeVideoCall, navigate, connectionStatus]);
+  }, [callId, cleanup, initializeVideoCall, navigate]);
 
   // Update video element handling
   useEffect(() => {
