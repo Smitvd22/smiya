@@ -70,6 +70,23 @@ body.landing-page-active .navbar {
   background-color: #f8f9fa;
 }
 
+.sidebar-link {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0.5rem 0;
+  text-align: left;
+  width: 100%;
+  display: block;
+  text-decoration: none;
+}
+
+.sidebar-link:hover {
+  text-decoration: underline;
+}
+
 /* Overlay */
 .overlay {
   position: fixed;

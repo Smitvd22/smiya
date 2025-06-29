@@ -1060,7 +1060,7 @@ const VideoCall = () => {
         cleanup(true);
       }
     };
-  }, [callId, cleanup, initializeVideoCall, navigate]);
+  }, [callId, cleanup, initializeVideoCall, navigate ,connectionStatus , myPeerId]);
 
   // Update video element handling
   useEffect(() => {
@@ -1072,7 +1072,7 @@ const VideoCall = () => {
     } else if (myVideo.current && (!hasVideoPermission || !isVideoEnabled)) {
       myVideo.current.srcObject = null;
     }
-  }, [hasVideoPermission, isVideoEnabled]);
+  }, [hasVideoPermission, isVideoEnabled, connectionStatus, myPeerId]);
 
   // Update the track change effect (around line 865)
   useEffect(() => {

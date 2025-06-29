@@ -36,10 +36,10 @@ function LandingPage() {
       <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <span className="close-btn" onClick={closeSidebar}>&times;</span>
         <div className="sidebar-content">
-          <a href="#" onClick={() => handleNavigation('revision')}>Revision</a>
-          <a href="#" onClick={() => handleNavigation('course')}>Course</a>
-          <a href="#" onClick={() => handleNavigation('previous-year')}>Previous Year</a>
-          <a href="#" onClick={() => handleNavigation('syllabus')}>Syllabus</a>
+          <button onClick={() => handleNavigation('revision')} className="sidebar-link">Revision</button>
+          <button onClick={() => handleNavigation('course')} className="sidebar-link">Course</button>
+          <button onClick={() => handleNavigation('previous-year')} className="sidebar-link">Previous Year</button>
+          <button onClick={() => handleNavigation('syllabus')} className="sidebar-link">Syllabus</button>
         </div>
       </div>
 
