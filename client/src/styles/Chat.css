@@ -237,3 +237,171 @@
   margin: 8px 0;
   text-align: center;
 }
+
+/* Reply context styling */
+.reply-context {
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 8px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+  border-left: 3px solid var(--primary-cyan);
+}
+
+.reply-indicator {
+  font-weight: bold;
+  color: #777;
+  margin-bottom: 2px;
+}
+
+.reply-content {
+  opacity: 0.8;
+}
+
+/* Message actions styling */
+.message-actions {
+  display: flex;
+  gap: 8px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  position: absolute;
+  right: 10px;
+  top: -20px;
+}
+
+.message.sent .message-actions {
+  right: 10px;
+}
+
+.message.received .message-actions {
+  left: 10px;
+}
+
+.message:hover .message-actions {
+  opacity: 1;
+}
+
+.action-button {
+  background: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s;
+}
+
+.action-button:hover {
+  transform: scale(1.1);
+}
+
+/* Improved emoji picker container */
+.emoji-picker-container {
+  position: absolute;
+  z-index: 1000;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  overflow: hidden;
+  background-color: white;
+}
+
+/* Position picker differently based on message type */
+.emoji-picker-sent {
+  right: 10px;
+  bottom: 100%;
+  margin-bottom: 10px;
+}
+
+.emoji-picker-received {
+  left: 10px;
+  bottom: 100%;
+  margin-bottom: 10px;
+}
+
+/* Close button for emoji picker */
+.emoji-picker-close {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 20px;
+  height: 20px;
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1001;
+  font-size: 12px;
+}
+
+.emoji-picker-close:hover {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+/* Make sure emoji picker doesn't overflow screen on mobile */
+@media (max-width: 480px) {
+  .emoji-picker-container {
+    position: fixed;
+    left: 50% !important;
+    right: auto !important;
+    bottom: 50% !important;
+    transform: translate(-50%, 50%);
+    margin-bottom: 0;
+    width: 90vw;
+    max-width: 320px;
+  }
+  
+  .emoji-picker-close {
+    top: 10px;
+    right: 10px;
+    width: 30px;
+    height: 30px;
+    font-size: 16px;
+  }
+  
+  /* Add overlay background for mobile */
+  .emoji-picker-container::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: -1;
+  }
+}
+
+/* CSS for highlighted message when scrolling to it */
+@keyframes highlightAnimation {
+  0% { background-color: rgba(255, 230, 0, 0.2); }
+  50% { background-color: rgba(255, 230, 0, 0.5); }
+  100% { background-color: rgba(255, 230, 0, 0.2); }
+}
+
+.highlight-message {
+  animation: highlightAnimation 2s ease;
+  border: 2px solid rgba(255, 230, 0, 0.7) !important;
+  box-shadow: 0 0 8px rgba(255, 230, 0, 0.5) !important;
+}
+
+/* Improve reply context button appearance */
+.reply-context {
+  background-color: rgba(0, 0, 0, 0.05);
+  border-left: 3px solid #3498db;
+  padding: 5px 8px;
+  margin-bottom: 5px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  transition: background-color 0.2s;
+}
+
+.reply-context:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}

@@ -27,18 +27,39 @@ const MediaUpload = ({ onUploadSuccess, onCancel }) => {
     };
   }, []);
 
+  // Improved effect to properly handle video loading state
   useEffect(() => {
-    if (showCapture && videoRef.current && streamRef.current) {
-      // Double-check that video element is properly connected to stream
-      if (!videoRef.current.srcObject) {
-        videoRef.current.srcObject = streamRef.current;
+    // Check if video is actually loaded and playing
+    const handleVideoLoad = () => {
+      console.log("Camera video stream loaded successfully");
+      // Make sure UI updates when video is actually playing
+      if (videoRef.current && videoRef.current.readyState >= 2) {
+        videoRef.current.classList.add('camera-loaded');
       }
+    };
+
+    if (showCapture && videoRef.current && streamRef.current) {
+      // Store a reference to the current video element
+      const currentVideo = videoRef.current;
+      
+      // Double-check that video element is properly connected to stream
+      if (!currentVideo.srcObject) {
+        currentVideo.srcObject = streamRef.current;
+      }
+      
+      // Add event listener for when video can play
+      currentVideo.addEventListener('loadeddata', handleVideoLoad);
       
       // Verify stream is active
       const tracks = streamRef.current.getVideoTracks();
       if (tracks.length > 0 && !tracks[0].enabled) {
         tracks[0].enabled = true;
       }
+      
+      return () => {
+        // Use the stored reference in the cleanup function
+        currentVideo.removeEventListener('loadeddata', handleVideoLoad);
+      };
     }
   }, [showCapture]);
 
@@ -99,22 +120,44 @@ const MediaUpload = ({ onUploadSuccess, onCancel }) => {
 
   const startCameraCapture = async () => {
     try {
-      // Always use both video and audio constraints for the combined interface
-      const constraints = { video: true, audio: true };
-      
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = stream;
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-      
+      console.log("Starting camera capture...");
       setShowCapture(true);
       // Default to image type initially
       setMediaType('image');
+      
+      // Always use both video and audio constraints for the combined interface
+      const constraints = { 
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: "user"
+        }, 
+        audio: true 
+      };
+      
+      console.log("Requesting user media with constraints:", constraints);
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log("Stream obtained successfully");
+      streamRef.current = stream;
+      
+      if (videoRef.current) {
+        console.log("Setting video source object");
+        videoRef.current.srcObject = stream;
+        
+        // Make sure the video element updates correctly
+        videoRef.current.onloadedmetadata = () => {
+          console.log("Video metadata loaded");
+          videoRef.current.play().catch(e => console.error("Error playing video:", e));
+        };
+      } else {
+        console.error("Video ref not available");
+      }
     } catch (err) {
       console.error('Media capture error:', err);
       alert('Could not access camera/microphone. Please check permissions.');
+      // If we can't access camera, go back to file upload view
+      setShowCapture(false);
+      setMediaType(null);
     }
   };
 
@@ -172,6 +215,12 @@ const MediaUpload = ({ onUploadSuccess, onCancel }) => {
   };
 
   const handleCaptureButtonDown = () => {
+    // Make sure the video is loaded before allowing capture
+    if (!videoRef.current || videoRef.current.readyState < 2) {
+      console.log("Camera not ready yet, ignoring capture attempt");
+      return;
+    }
+
     // Start a timer to detect if this is a long press (for video)
     pressTimerRef.current = setTimeout(() => {
       // It's a long press, start video recording
@@ -181,6 +230,12 @@ const MediaUpload = ({ onUploadSuccess, onCancel }) => {
   };
 
   const handleCaptureButtonUp = () => {
+    // If video isn't ready, don't attempt to capture
+    if (!videoRef.current || videoRef.current.readyState < 2) {
+      console.log("Camera not ready yet, ignoring capture attempt");
+      return;
+    }
+    
     // If press timer still exists, it was a short press (photo)
     if (pressTimerRef.current) {
       clearTimeout(pressTimerRef.current);
@@ -188,6 +243,7 @@ const MediaUpload = ({ onUploadSuccess, onCancel }) => {
       
       // It was a short click, capture photo
       if (!isRecording) {
+        console.log("Taking photo");
         capturePhoto();
       } else {
         // If already recording, stop the recording
@@ -258,10 +314,20 @@ const MediaUpload = ({ onUploadSuccess, onCancel }) => {
     
     canvas.toBlob((blob) => {
       const imageFile = new File([blob], "capture.jpg", { type: 'image/jpeg' });
+      console.log("Photo captured, switching to preview mode");
       setFile(imageFile);
       setPreviewUrl(URL.createObjectURL(blob));
-      setShowCapture(false);
+      
+      // Important: first stop media stream then update UI state
       stopMediaStream();
+      // Ensure we're exiting the capture mode
+      setShowCapture(false);
+      setMediaType('image');
+      
+      // Add small delay to ensure state updates properly
+      setTimeout(() => {
+        console.log("Preview should now be visible");
+      }, 100);
     }, 'image/jpeg');
   };
 
@@ -364,17 +430,18 @@ const MediaUpload = ({ onUploadSuccess, onCancel }) => {
                 className="camera-feed"
                 style={{ display: 'block', width: '100%', maxHeight: '70vh', objectFit: 'cover' }}
               />
-              {!videoRef.current?.srcObject && (
-                <div className="camera-loading" style={{ 
-                  position: 'absolute', 
-                  top: '50%', 
-                  left: '50%', 
-                  transform: 'translate(-50%, -50%)',
-                  color: 'white' 
-                }}>
-                  Loading camera...
-                </div>
-              )}
+              <div className="camera-loading" style={{ 
+                position: 'absolute', 
+                top: '50%', 
+                left: '50%', 
+                transform: 'translate(-50%, -50%)',
+                color: 'white',
+                opacity: videoRef.current?.readyState >= 2 ? '0' : '1',
+                transition: 'opacity 0.3s ease',
+                visibility: videoRef.current?.readyState >= 2 ? 'hidden' : 'visible'
+              }}>
+                
+              </div>
             </>
           ) : (
             <div className="audio-recording">
@@ -406,8 +473,21 @@ const MediaUpload = ({ onUploadSuccess, onCancel }) => {
                 onMouseUp={handleCaptureButtonUp}
                 onTouchStart={handleCaptureButtonDown}
                 onTouchEnd={handleCaptureButtonUp}
+                style={{
+                  width: '60px',
+                  height: '60px',
+                  borderRadius: '50%',
+                  backgroundColor: isRecording ? 'red' : '#2196f3',
+                  border: '3px solid white',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                  marginTop: '10px'
+                }}
               >
-                {!isRecording ? '' : 'Recording...'}
+                {!isRecording ? '📷' : '⏺️'}
               </button>
             ) : (
               <button 

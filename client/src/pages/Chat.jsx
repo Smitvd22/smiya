@@ -5,6 +5,8 @@ import { getCurrentUser } from '../services/authService';
 import { useCall } from '../contexts/CallContext';
 import MediaUpload from '../components/MediaUpload';
 import MediaDisplay from '../components/MediaDisplay';
+// Add emoji picker import
+import EmojiPicker from 'emoji-picker-react';
 import '../styles/Chat.css';
 
 function Chat() {
@@ -26,6 +28,11 @@ function Chat() {
   const [isScrollLocked, setIsScrollLocked] = useState(false); // New state for scroll locking
   const [showMediaUpload, setShowMediaUpload] = useState(false); // New state for media upload
 
+  // New state for reply and reactions
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [activeReactionMessage, setActiveReactionMessage] = useState(null);
+
   const socketRef = useRef(socket);
   const hasJoinedRoom = useRef(false);
   
@@ -33,6 +40,43 @@ function Chat() {
   
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
   const MESSAGES_PER_PAGE = 20;
+  
+  // Add a preprocessMessage function to prepare media properly before rendering
+  const preprocessMessage = useCallback((message) => {
+    if (!message) return message;
+    
+    // Create a processed copy of the message
+    const processedMessage = {...message};
+    
+    // If message has media, ensure it's properly formatted for immediate loading
+    if (processedMessage.mediaUrl) {
+      // Add a timestamp to the message to force proper loading
+      processedMessage.mediaTimestamp = Date.now();
+      
+      // Ensure media type is set correctly
+      if (!processedMessage.mediaType) {
+        // Try to infer media type from URL or format
+        const url = processedMessage.mediaUrl.toLowerCase();
+        if (url.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp)($|\?)/)) {
+          processedMessage.mediaType = 'image';
+        } else if (url.match(/\.(mp4|webm|mov|avi|flv|wmv|mkv)($|\?)/)) {
+          processedMessage.mediaType = 'video';
+        } else if (url.match(/\.(mp3|wav|ogg|aac|flac)($|\?)/)) {
+          processedMessage.mediaType = 'audio';
+        } else {
+          // Default to image if we can't determine
+          processedMessage.mediaType = 'image';
+        }
+      }
+    }
+    
+    return processedMessage;
+  }, []);
+  
+  // Preprocess messages before setting to state - defined before it's used in fetchChatHistory
+  const processMessages = useCallback((messages) => {
+    return messages.map(preprocessMessage);
+  }, [preprocessMessage]);
   
   // Modified function to fetch chat history with pagination
   const fetchChatHistory = useCallback(async (pageNum = 1, append = false) => {
@@ -53,42 +97,48 @@ function Chat() {
       // Get messages from response
       const fetchedMessages = response.data.messages || response.data;
       
+      // Debug log for reactions and replies
+      console.log("Fetched messages:", fetchedMessages);
+      fetchedMessages.forEach(msg => {
+        if (msg.replyToId) console.log(`Message ${msg.id} is replying to ${msg.replyToId}`);
+        if (msg.reactions && msg.reactions.length > 0) console.log(`Message ${msg.id} has ${msg.reactions.length} reactions`);
+      });
+      
       if (fetchedMessages.length < MESSAGES_PER_PAGE) {
         setHasMore(false);
       }
       
+      // Process messages to ensure media is properly formatted for immediate loading
+      const processedMessages = processMessages(fetchedMessages);
+      
       // For pagination: add NEW messages at BEGINNING of array (older messages)
       if (append) {
-        // Save current scroll height before adding new messages
-        const prevHeight = messagesContainerRef.current?.scrollHeight || 0;
+        // We can remove the unused scroll position tracking variables
+        // and just update the messages directly
         
         setMessages(prev => {
           const prevIds = new Set(prev.map(msg => msg.id));
-          const uniqueNewMessages = fetchedMessages.filter(msg => !prevIds.has(msg.id));
+          const uniqueNewMessages = processedMessages.filter(msg => !prevIds.has(msg.id));
           return [...uniqueNewMessages, ...prev]; // Prepend older messages
         });
         
-        // After adding new messages, adjust scroll position
+        // After adding new messages, adjust scroll position and ensure scroll lock is released
         setTimeout(() => {
-          if (messagesContainerRef.current && fetchedMessages.length > 0) {
-            // Calculate height of new content and set scroll position
-            const newTotalHeight = messagesContainerRef.current.scrollHeight;
-            const addedHeight = newTotalHeight - prevHeight;
-            messagesContainerRef.current.scrollTop = addedHeight;
-          }
+          // Unlock scrolling after ensuring messages are rendered
           setIsScrollLocked(false);
-        }, 100);
+        }, 300); // Increased timeout to ensure rendering completes
       } else {
-        // First load - just set messages
-        setMessages(fetchedMessages);
+        // First load - set processed messages
+        setMessages(processedMessages);
         
         // For initial load, scroll to bottom after a brief delay
         setTimeout(() => {
           if (messagesContainerRef.current) {
             messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
           }
+          // Unlock scrolling after ensuring messages are rendered
           setIsScrollLocked(false);
-        }, 100);
+        }, 300); // Increased timeout to ensure rendering completes
       }
       
       setLoading(false);
@@ -98,9 +148,9 @@ function Chat() {
       setLoading(false);
       setLoadingMore(false);
       setError('Could not load chat history');
-      setIsScrollLocked(false);
+      setIsScrollLocked(false); // Ensure scroll lock is released on error
     }
-  }, [API_URL, friendId]);
+  }, [API_URL, friendId, processMessages]);
   
   // Fetch friend information
   const fetchFriendInfo = useCallback(async () => {
@@ -155,19 +205,26 @@ function Chat() {
   
   // Modified scroll handler to load older messages when scrolling to top
   const handleScroll = useCallback(() => {
-    if (!messagesContainerRef.current || isScrollLocked) return;
+    if (!messagesContainerRef.current || isScrollLocked || loadingMore) return;
     
     const { scrollTop } = messagesContainerRef.current;
     
-    // When user scrolls to TOP, load older messages
+    // When user scrolls near TOP (within 50px), load older messages
     if (scrollTop < 50 && !loadingMore && hasMore) {
+      console.log('Near top of scroll area, loading older messages');
       setLoadingMore(true);
       
-      // Load next page of messages
-      const nextPage = page + 1;
-      setPage(nextPage);
-      
-      fetchChatHistory(nextPage, true);
+      // Use a short timeout to prevent multiple simultaneous loading attempts
+      setTimeout(() => {
+        // Double-check we're still in loading state to prevent duplicate loads
+        if (!loadingMore) {
+          // Load next page of messages
+          const nextPage = page + 1;
+          setPage(nextPage);
+          
+          fetchChatHistory(nextPage, true);
+        }
+      }, 100);
     }
   }, [fetchChatHistory, hasMore, loadingMore, page, isScrollLocked]);
   
@@ -203,6 +260,12 @@ function Chat() {
       if (!hasJoinedRoom.current) {
         console.log(`Joining chat room: ${roomId}`);
         socket.emit('join-room', roomId);
+        
+        // Also join rooms for reaction notifications for all loaded messages
+        messages.forEach(msg => {
+          socket.emit('join-room', `message-${msg.id}`);
+        });
+        
         hasJoinedRoom.current = true;
       }
     };
@@ -226,32 +289,32 @@ function Chat() {
       socket.off('disconnect', handleDisconnect);
       hasJoinedRoom.current = false;
     };
-  }, [socket, friendId]);
+  }, [socket, friendId, messages]);
   
   // Listen for new messages - modified to add at end of array
   useEffect(() => {
     if (!socket) return;
     
     const handleNewMessage = (message) => {
-      console.log('New message received:', message);
-      const currentUser = getCurrentUser();
-      if (!currentUser) return;
-      
-      // Only add message if it belongs to current conversation
-      if (
-        (message.senderId === parseInt(friendId) && message.receiverId === currentUser.id) || 
-        (message.senderId === currentUser.id && message.receiverId === parseInt(friendId))
-      ) {
-        // Add new message to the END of the array (newest at the end)
-        setMessages(prev => [...prev, message]);
+      // When new message arrives, add to end of message list
+      setMessages(prevMessages => {
+        // Check if message already exists (avoid duplicates)
+        if (prevMessages.some(m => m.id === message.id)) {
+          return prevMessages;
+        }
         
-        // Scroll to bottom when new message arrives
+        // Add new message
+        const newMessages = [...prevMessages, message];
+        
+        // Scroll to bottom after a brief delay
         setTimeout(() => {
           if (messagesContainerRef.current) {
             messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
           }
         }, 100);
-      }
+        
+        return newMessages;
+      });
     };
     
     socket.on('new-message', handleNewMessage);
@@ -260,6 +323,64 @@ function Chat() {
       socket.off('new-message', handleNewMessage);
     };
   }, [friendId, socket]);
+  
+  // Listen for reaction updates
+  useEffect(() => {
+    if (!socket) return;
+    
+    // Handle new reaction added to a message
+    const handleNewReaction = (reaction) => {
+      console.log("Received new reaction:", reaction);
+      setMessages(prevMessages => {
+        return prevMessages.map(msg => {
+          if (msg.id === reaction.messageId) {
+            // Create reactions array if it doesn't exist
+            const currentReactions = msg.reactions || [];
+            
+            // Check if this reaction already exists (by same user with same emoji)
+            const existingReactionIndex = currentReactions.findIndex(
+              r => r.userId === reaction.userId && r.emoji === reaction.emoji
+            );
+            
+            // If it exists, replace it, otherwise add it
+            if (existingReactionIndex >= 0) {
+              const updatedReactions = [...currentReactions];
+              updatedReactions[existingReactionIndex] = reaction;
+              return { ...msg, reactions: updatedReactions };
+            } else {
+              return { ...msg, reactions: [...currentReactions, reaction] };
+            }
+          }
+          return msg;
+        });
+      });
+    };
+    
+    // Handle reaction removed from a message
+    const handleReactionRemoved = (reaction) => {
+      console.log("Reaction removed:", reaction);
+      setMessages(prevMessages => {
+        return prevMessages.map(msg => {
+          if (msg.id === reaction.messageId && msg.reactions) {
+            // Filter out the removed reaction
+            const updatedReactions = msg.reactions.filter(
+              r => !(r.userId === reaction.userId && r.emoji === reaction.emoji)
+            );
+            return { ...msg, reactions: updatedReactions };
+          }
+          return msg;
+        });
+      });
+    };
+    
+    socket.on('new-reaction', handleNewReaction);
+    socket.on('reaction-removed', handleReactionRemoved);
+    
+    return () => {
+      socket.off('new-reaction', handleNewReaction);
+      socket.off('reaction-removed', handleReactionRemoved);
+    };
+  }, [socket]);
   
   // Warning display code
   useEffect(() => {
@@ -285,7 +406,60 @@ function Chat() {
     };
   }, [socketConnected, initialConnecting]);
 
-  // Send message function - updated to scroll to bottom after sending
+  // Add function to handle replying to a message
+  const handleReply = (message) => {
+    setReplyingTo(message);
+    // Focus input field after setting reply
+    setTimeout(() => {
+      const inputField = document.querySelector('.message-form input');
+      if (inputField) inputField.focus();
+    }, 100);
+  };
+
+  // Cancel reply
+  const cancelReply = () => {
+    setReplyingTo(null);
+  };
+
+  // Add function to handle adding a reaction
+  const handleReaction = (messageId) => {
+    setActiveReactionMessage(messageId === activeReactionMessage ? null : messageId);
+    setShowEmojiPicker(messageId === activeReactionMessage ? false : true);
+  };
+
+  // Add function to send a reaction
+  const sendReaction = async (messageId, emoji) => {
+    try {
+      const currentUser = getCurrentUser();
+      if (!currentUser || !currentUser.token) {
+        setError('You need to be logged in');
+        return;
+      }
+      
+      console.log('Reaction emoji object:', emoji);
+      
+      const reaction = {
+        messageId,
+        emoji: emoji.unified,
+        emojiName: emoji.names ? emoji.names[0] : emoji.name
+      };
+      
+      const response = await axios.post(`${API_URL}/messages/reactions`, reaction, {
+        headers: { Authorization: `Bearer ${currentUser.token}` }
+      });
+      
+      console.log('Reaction response:', response.data);
+      
+      // Hide emoji picker after selecting
+      setShowEmojiPicker(false);
+      setActiveReactionMessage(null);
+    } catch (err) {
+      console.error('Error adding reaction:', err);
+      setError('Failed to add reaction');
+    }
+  };
+
+  // Modify sendMessage to include reply information
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!messageInput.trim()) return;
@@ -298,7 +472,6 @@ function Chat() {
     
     if (!socketConnected) {
       console.warn('Socket disconnected, message delivery may be delayed');
-      // Show a temporary warning but continue sending (the HTTP request will still work)
       setError('Connection issue. Message will be sent when connection is restored.');
       setTimeout(() => setError(''), 3000);
     }
@@ -307,17 +480,20 @@ function Chat() {
       const newMessage = {
         content: messageInput,
         receiverId: friendId,
-        senderId: currentUser.id
+        senderId: currentUser.id,
+        // Add replyToId if replying to a message
+        replyToId: replyingTo ? replyingTo.id : null
       };
       
       await axios.post(`${API_URL}/messages`, newMessage, {
         headers: { Authorization: `Bearer ${currentUser.token}` }
       });
       
-      // Clear input after sending
+      // Clear input and reset reply state
       setMessageInput('');
+      setReplyingTo(null);
       
-      // After sending, scroll to bottom
+      // Scroll to bottom after sending
       setTimeout(() => {
         if (messagesContainerRef.current) {
           messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
@@ -365,28 +541,52 @@ function Chat() {
     }
   };
 
-
   // Modified message rendering to include media display
   const renderMessage = (message) => {
     const isCurrentUser = message.senderId === getCurrentUser()?.id;
   
-    
     // Check for missing media properties
     if (message.mediaUrl === undefined && message.hasMedia) {
       console.error('Message marked as having media but URL is missing:', message);
     }
     
+    // Find the message being replied to if applicable
+    const replyToMessage = message.replyToId 
+      ? messages.find(m => m.id === message.replyToId) 
+      : null;
+    
     return (
       <div 
         key={message.id} 
         className={`message ${isCurrentUser ? 'sent' : 'received'}`}
+        data-message-id={message.id} // Add data attribute for querying
       >
+        {/* Show reply context if this message is a reply */}
+        {message.replyToId && (
+          <div 
+            className="reply-context" 
+            onClick={() => scrollToMessage(message.replyToId)}
+            style={{ cursor: 'pointer' }}
+          >
+            <div className="reply-indicator">↩️ Reply to:</div>
+            <div className="reply-content">
+              {replyToMessage 
+                ? (replyToMessage.content 
+                    ? replyToMessage.content.substring(0, 50) + (replyToMessage.content.length > 50 ? '...' : '')
+                    : replyToMessage.mediaUrl 
+                      ? '[Media]' 
+                      : '[Message]')
+                : '[Original message not loaded]'}
+            </div>
+          </div>
+        )}
+        
         {/* Show message content if any */}
         {message.content && (
           <div className="message-content">{message.content}</div>
         )}
         
-        {/* Improved media detection logic */}
+        {/* Show media content */}
         {(message.mediaUrl || (message.hasMedia && !message.mediaUrl)) && (
           <MediaDisplay 
             media={{
@@ -394,10 +594,71 @@ function Chat() {
               resourceType: message.mediaType || 'image', 
               publicId: message.mediaPublicId || '',
               format: message.mediaFormat || '',
-              messageId: message.id
+              messageId: message.id,
+              // Use message's media timestamp if available, or generate a new one
+              timestamp: message.mediaTimestamp || new Date().getTime()
             }}
           />
         )}
+        
+        {/* Show reactions */}
+        {message.reactions && message.reactions.length > 0 && (
+          <div className="message-reactions">
+            {message.reactions.map((reaction, index) => (
+              <span key={index} className="reaction" title={reaction.username}>
+                {(() => {
+                  try {
+                    if (reaction.emoji.includes('-') || reaction.emoji.length > 6) {
+                      return String.fromCodePoint(...reaction.emoji.split('-').map(code => parseInt(code, 16)));
+                    } else {
+                      return String.fromCodePoint(parseInt(reaction.emoji, 16));
+                    }
+                  } catch (e) {
+                    console.error("Error rendering emoji", reaction.emoji, e);
+                    return '😊'; // Fallback emoji
+                  }
+                })()}
+              </span>
+            ))}
+          </div>
+        )}
+        
+        {/* Message actions (reply, react) */}
+        <div className="message-actions">
+          <button 
+            className="action-button reply-button" 
+            onClick={() => handleReply(message)}
+            title="Reply"
+          >
+            ↩️
+          </button>
+          <button 
+            className="action-button react-button" 
+            onClick={() => handleReaction(message.id)}
+            title="React"
+          >
+            😊
+          </button>
+          
+          {/* Show emoji picker for this message with improved positioning */}
+          {showEmojiPicker && activeReactionMessage === message.id && (
+            <div className={`emoji-picker-container ${isCurrentUser ? 'emoji-picker-sent' : 'emoji-picker-received'}`}>
+              <div className="emoji-picker-close" onClick={() => {
+                setShowEmojiPicker(false);
+                setActiveReactionMessage(null);
+              }}>✕</div>
+              <EmojiPicker
+                onEmojiClick={(emojiObj) => sendReaction(message.id, emojiObj)}
+                disableAutoFocus={true}
+                native={true}
+                searchPlaceholder="Search emoji..."
+                previewConfig={{ showPreview: false }}
+                width="min(100vw - 20px, 280px)"
+                height="320px"
+              />
+            </div>
+          )}
+        </div>
         
         <div className="message-time">
           {new Date(message.createdAt).toLocaleTimeString([], { 
@@ -493,6 +754,37 @@ function Chat() {
     };
   }, [socket, navigate]);
 
+  // Function to scroll to a specific message by ID
+  const scrollToMessage = (messageId) => {
+    // Find the message element by ID
+    const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+    
+    if (!messageElement) {
+      console.log(`Message with ID ${messageId} not found in current view. It might need to be loaded.`);
+      setError('Message not found in current view. Try loading more messages.');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+    
+    // Apply a highlight effect to the target message
+    messageElement.classList.add('highlight-message');
+    
+    // Scroll to the message with a small offset from the top
+    const container = messagesContainerRef.current;
+    const messageTop = messageElement.offsetTop;
+    
+    // Smooth scroll to the message position
+    container.scrollTo({
+      top: messageTop - 100, // 100px offset from top for better visibility
+      behavior: 'smooth'
+    });
+    
+    // Remove highlight after a delay
+    setTimeout(() => {
+      messageElement.classList.remove('highlight-message');
+    }, 2000);
+  };
+
   return (
     <div className="chat-container">
       <div className="chat-header">
@@ -577,6 +869,29 @@ function Chat() {
         />
       )}
       
+      {/* Show reply preview if replying to a message */}
+      {replyingTo && (
+        <div className="reply-preview">
+          <div className="reply-preview-content">
+            <span className="reply-to-label">Reply to: </span>
+            <span className="reply-text">
+              {replyingTo.content 
+                ? replyingTo.content.substring(0, 30) + (replyingTo.content.length > 30 ? '...' : '')
+                : '[Media]'
+              }
+            </span>
+          </div>
+          <button 
+            className="cancel-reply" 
+            onClick={cancelReply}
+            title="Cancel reply"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+      
+      {/* Message form */}
       <form className="message-form" onSubmit={sendMessage}>
         <button 
           type="button" 
@@ -589,7 +904,7 @@ function Chat() {
           type="text"
           value={messageInput}
           onChange={(e) => setMessageInput(e.target.value)}
-          placeholder="Type a message..."
+          placeholder={replyingTo ? "Type your reply..." : "Type a message..."}
           disabled={loading || isScrollLocked}
         />
         <button type="submit" disabled={!messageInput.trim() || loading || isScrollLocked}>

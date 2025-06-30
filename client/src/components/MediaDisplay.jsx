@@ -2,42 +2,80 @@ import React, { useState, useEffect, useRef } from 'react';
 import '../styles/MediaDisplay.css';
 
 const MediaDisplay = ({ media }) => {
+  // Initialize with true for immediate loading in message contexts
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
+  // Initialize isVisible to true so we immediately start loading
+  const [isVisible, setIsVisible] = useState(true);
+  // Reference to hold the container element
   const containerRef = useRef(null);
+  const mediaUrlRef = useRef(media?.url || ''); // Initialize with current URL if available
 
-  // Effect when media changes
+  // Effect when media changes - using a ref to avoid unnecessary reloads
   useEffect(() => {
     if (!media || !media.url) {
       console.error("Media data missing required URL property:", media);
       setLoadError(true);
       setIsLoading(false);
-    } else {
-      // Reset error state when valid media is provided
+      return;
+    }
+    
+    // Only update if the media has meaningfully changed
+    // This prevents reloading when a parent component re-renders due to unrelated state changes
+    if (mediaUrlRef.current !== media.url && 
+        (!mediaUrlRef.current.split('?')[0] || 
+         mediaUrlRef.current.split('?')[0] !== media.url.split('?')[0] || 
+         media.timestamp)) {
+      
+      console.log("Media URL changed or timestamp updated, resetting loading state");
+      
+      // Store the new URL with timestamp if present
+      mediaUrlRef.current = media.url;
+      
+      // Reset states
       setLoadError(false);
       setIsLoading(true);
     }
   }, [media]);
 
-  // Lazy loading with Intersection Observer
+  // Modified Intersection Observer that only affects visibility, not loading
   useEffect(() => {
+    if (!media || !media.url) return;
+    
     const observer = new IntersectionObserver(
-      ([entry]) => {
+      (entries) => {
+        const [entry] = entries;
         if (entry.isIntersecting) {
+          console.log("Media element became visible:", media.url);
           setIsVisible(true);
-          observer.disconnect();
+        } else {
+          // We still track visibility for potential optimizations
+          // but we don't stop loading or unload media
+          console.log("Media element no longer visible:", media.url);
+          // Don't set isVisible to false to avoid reloading when scrolling back
         }
       },
-      { threshold: 0.1 }
+      { 
+        threshold: 0.1,
+        rootMargin: "200px" // Increased margin to load earlier before becoming visible
+      }
     );
     
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
+    // Save the current value of containerRef to a local variable to use in cleanup
+    const currentContainer = containerRef.current;
+    
+    if (currentContainer) {
+      observer.observe(currentContainer);
     }
     
-    return () => observer.disconnect();
-  }, []);
+    return () => {
+      // Use the saved reference in cleanup to avoid the React hooks warning
+      if (currentContainer) {
+        observer.unobserve(currentContainer);
+      }
+      observer.disconnect();
+    };
+  }, [media]);
 
   // Download media function
   const downloadMedia = () => {
@@ -78,13 +116,19 @@ const MediaDisplay = ({ media }) => {
   const retryLoading = () => {
     if (!media || !media.url) return;
     
+    // Reset loading states
     setIsLoading(true);
     setLoadError(false);
-    // Force re-render of the media element by adding timestamp to URL
-    media.url = `${media.url.split('?')[0]}?t=${new Date().getTime()}`;
+    
+    // Force re-render of the media element by adding a fresh timestamp to URL
+    const baseUrl = media.url.split('?')[0];
+    media.url = `${baseUrl}?t=${new Date().getTime()}`;
+    mediaUrlRef.current = media.url; // Update the ref to match
+    
+    console.log("Retrying media load with URL:", media.url);
   };
 
-  // Get optimized URL with Cloudinary transformations
+  // Get optimized URL with Cloudinary transformations and cache busting
   const getOptimizedUrl = () => {
     if (!media || !media.url) return '';
     
@@ -92,11 +136,34 @@ const MediaDisplay = ({ media }) => {
     const baseUrl = media.url.includes('?') ? media.url.split('?')[0] : media.url;
     
     // Add appropriate transformations based on resource type
-    const transformations = media.resourceType === 'image' 
-      ? 'q_auto,f_auto,w_500' 
-      : 'q_auto';
+    let transformations = '';
+    
+    if (media.resourceType === 'image') {
+      // Enhanced image transformations for faster loading
+      // Format auto for WebP/AVIF where supported
+      // Quality auto for optimal compression
+      // Width auto for responsive sizing
+      transformations = 'q_auto:good,f_auto,w_auto,dpr_auto';
       
-    return `${baseUrl}?${transformations}`;
+      // Add small thumbnail for immediate display while high quality loads
+      if (baseUrl.includes('cloudinary.com')) {
+        transformations += ',e_blur:1000,w_50,h_50,c_scale/e_grayscale';
+      }
+    } 
+    else if (media.resourceType === 'video') {
+      // Video optimizations
+      transformations = 'q_auto:good,vc_auto,vs_25';
+    }
+    else {
+      // Default quality optimization
+      transformations = 'q_auto:good';
+    }
+    
+    // Add a permanent cache key based on message ID or public ID if available
+    // This ensures the URL doesn't change on every render but does change when content changes
+    const cacheKey = media.messageId || media.publicId || media.timestamp || new Date().getTime();
+    
+    return `${baseUrl}?${transformations}&_cacheKey=${cacheKey}`;
   };
 
   const renderMedia = () => {
@@ -110,7 +177,9 @@ const MediaDisplay = ({ media }) => {
       );
     }
     
-    if (!isVisible) return <div className="media-placeholder" style={{ minHeight: '150px' }}></div>;
+    // We've simplified the condition checks:
+    // No more waiting for visibility - media should load immediately
+    // If it's not visible in the DOM, it won't render anyway
 
     // Normalize resource type to handle various formats
     const resourceType = (media.resourceType || '').toLowerCase();
@@ -136,11 +205,14 @@ const MediaDisplay = ({ media }) => {
             onLoad={handleMediaLoad}
             onError={handleMediaError}
             style={{ display: isLoading || loadError ? 'none' : 'block' }}
+            loading="eager" 
+            decoding="async"
+            fetchpriority="high"
+            key={media.timestamp || new Date().getTime()} // Add key to force re-render
           />
         </div>
       );
     } 
-    // Remaining media type handling remains the same...
     else if (resourceType.includes('video') || ['mp4', 'webm', 'mov', 'avi'].includes(resourceType)) {
       return (
         <div className="video-container">
@@ -158,8 +230,14 @@ const MediaDisplay = ({ media }) => {
             controls 
             src={optimizedUrl}
             onLoadedData={handleMediaLoad}
+            onCanPlayThrough={handleMediaLoad} // Added this event to mark as loaded when can play
             onError={handleMediaError}
             style={{ display: isLoading || loadError ? 'none' : 'block' }}
+            preload="auto"
+            autoPlay={false}
+            muted={true} // Initially muted to allow autoplay if desired
+            playsInline
+            key={media.timestamp || new Date().getTime()} // Add key to force re-render
           />
         </div>
       );
@@ -182,8 +260,11 @@ const MediaDisplay = ({ media }) => {
             controls 
             src={optimizedUrl}
             onLoadedData={handleMediaLoad}
+            onCanPlayThrough={handleMediaLoad} // Added this event to mark as loaded when can play
             onError={handleMediaError}
             style={{ display: isLoading || loadError ? 'none' : 'block' }}
+            preload="auto"
+            key={media.timestamp || new Date().getTime()} // Add key to force re-render
           />
         </div>
       );

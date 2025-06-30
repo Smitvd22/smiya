@@ -27,7 +27,7 @@ export const setupSocketIO = (io) => {
     // Join a specific chat room (for private messaging)
     socket.on('join-room', (roomId) => {
       socket.join(roomId);
-      console.log(`Socket ${socket.id} joined room: ${roomId}`);
+      // console.log(`Socket ${socket.id} joined room: ${roomId}`);
     });
 
     // Join personal room for receiving calls and store user ID

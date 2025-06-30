@@ -142,6 +142,20 @@
   100% { opacity: 1; }
 }
 
+.camera-feed.camera-loaded + .camera-loading {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.camera-feed {
+  transition: opacity 0.3s ease;
+  background-color: #000;
+}
+
+.capture-button {
+  animation: pulse 2s infinite;
+}
+
 .capture-instructions {
   color: #fff;
   background-color: rgba(0, 0, 0, 0.5);

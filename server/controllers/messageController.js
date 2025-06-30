@@ -12,8 +12,8 @@ export const getChatHistory = async (req, res) => {
   const offset = (page - 1) * limit;
   
   try {
-    // Get messages where current user is sender OR receiver
-    const result = await pool.query(
+    // First get messages
+    const messagesResult = await pool.query(
       `SELECT * FROM messages 
        WHERE (sender_id = $1 AND receiver_id = $2)
        OR (sender_id = $2 AND receiver_id = $1)
@@ -22,17 +22,51 @@ export const getChatHistory = async (req, res) => {
       [userId, friendId, limit, offset]
     );
     
-    // Map DB column names to camelCase for frontend
-    const messages = result.rows.map(msg => ({
+    // Get message IDs for fetching reactions
+    const messageIds = messagesResult.rows.map(msg => msg.id);
+    
+    // Get reactions for these messages if there are any messages
+    let reactionsResult = { rows: [] };
+    if (messageIds.length > 0) {
+      reactionsResult = await pool.query(
+        `SELECT r.*, u.username 
+         FROM message_reactions r
+         JOIN users u ON r.user_id = u.id
+         WHERE r.message_id = ANY($1)
+         ORDER BY r.created_at ASC`,
+        [messageIds]
+      );
+    }
+    
+    // Group reactions by message ID
+    const reactionsByMessageId = {};
+    reactionsResult.rows.forEach(reaction => {
+      const messageId = reaction.message_id;
+      if (!reactionsByMessageId[messageId]) {
+        reactionsByMessageId[messageId] = [];
+      }
+      reactionsByMessageId[messageId].push({
+        id: reaction.id,
+        userId: reaction.user_id,
+        username: reaction.username,
+        emoji: reaction.emoji,
+        emojiName: reaction.emoji_name
+      });
+    });
+    
+    // Map DB column names to camelCase for frontend and include reactions
+    const messages = messagesResult.rows.map(msg => ({
       id: msg.id,
       content: msg.content,
       senderId: msg.sender_id,
       receiverId: msg.receiver_id,
+      replyToId: msg.reply_to_id,
       mediaUrl: msg.media_url,
       mediaType: msg.media_type,
       mediaPublicId: msg.media_public_id, 
       mediaFormat: msg.media_format,
-      createdAt: msg.created_at
+      createdAt: msg.created_at,
+      reactions: reactionsByMessageId[msg.id] || []
     }));
     
     // Note: We're returning messages in DESC order to get the most recent first
@@ -46,7 +80,7 @@ export const getChatHistory = async (req, res) => {
 
 // Send a new message
 export const sendMessage = async (req, res) => {
-  const { content, receiverId } = req.body;
+  const { content, receiverId, replyToId } = req.body;
   const senderId = req.user.userId;
   
   if (!content || !receiverId) {
@@ -54,11 +88,11 @@ export const sendMessage = async (req, res) => {
   }
   
   try {
-    // Insert message into database
+    // Insert message into database with replyToId
     const result = await pool.query(
-      `INSERT INTO messages (content, sender_id, receiver_id)
-       VALUES ($1, $2, $3) RETURNING *`,
-      [content, senderId, receiverId]
+      `INSERT INTO messages (content, sender_id, receiver_id, reply_to_id)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [content, senderId, receiverId, replyToId]
     );
     
     const newMessage = {
@@ -66,6 +100,7 @@ export const sendMessage = async (req, res) => {
       content: result.rows[0].content,
       senderId: result.rows[0].sender_id,
       receiverId: result.rows[0].receiver_id,
+      replyToId: result.rows[0].reply_to_id,
       mediaUrl: result.rows[0].media_url,
       mediaType: result.rows[0].media_type,
       mediaPublicId: result.rows[0].media_public_id,
@@ -73,7 +108,7 @@ export const sendMessage = async (req, res) => {
       createdAt: result.rows[0].created_at
     };
     
-    // Emit to socket (will be handled in socket setup)
+    // Emit to socket
     const io = req.app.get('io');
     const chatRoom = [senderId, receiverId].sort().join('-');
     io.to(chatRoom).emit('new-message', newMessage);
@@ -123,5 +158,117 @@ export const sendMediaMessage = async (req, res) => {
   } catch (error) {
     console.error('Send media message error:', error);
     res.status(500).json({ error: 'Failed to send media message' });
+  }
+};
+
+// Add a reaction to a message
+export const addReaction = async (req, res) => {
+  const { messageId, emoji, emojiName } = req.body;
+  const userId = req.user.userId;
+  
+  if (!messageId || !emoji) {
+    return res.status(400).json({ error: 'Message ID and emoji are required' });
+  }
+  
+  try {
+    // Check if the user already reacted with this emoji to this message
+    const existingReaction = await pool.query(
+      `SELECT * FROM message_reactions 
+       WHERE message_id = $1 AND user_id = $2 AND emoji = $3`,
+      [messageId, userId, emoji]
+    );
+    
+    if (existingReaction.rows.length > 0) {
+      // Remove the reaction if it already exists (toggle behavior)
+      await pool.query(
+        `DELETE FROM message_reactions 
+         WHERE message_id = $1 AND user_id = $2 AND emoji = $3`,
+        [messageId, userId, emoji]
+      );
+      
+      // Get user info for the response
+      const userInfo = await pool.query(
+        `SELECT username FROM users WHERE id = $1`,
+        [userId]
+      );
+      
+      const reactionData = {
+        id: existingReaction.rows[0].id,
+        messageId,
+        userId,
+        username: userInfo.rows[0].username,
+        emoji,
+        emojiName,
+        removed: true
+      };
+      
+      // Emit event to socket
+      const io = req.app.get('io');
+      io.to(`message-${messageId}`).emit('reaction-removed', reactionData);
+      
+      return res.status(200).json({ message: 'Reaction removed', reaction: reactionData });
+    }
+    
+    // Add new reaction
+    const result = await pool.query(
+      `INSERT INTO message_reactions (message_id, user_id, emoji, emoji_name, created_at)
+       VALUES ($1, $2, $3, $4, NOW()) RETURNING *`,
+      [messageId, userId, emoji, emojiName]
+    );
+    
+    // Get user info for the response
+    const userInfo = await pool.query(
+      `SELECT username FROM users WHERE id = $1`,
+      [userId]
+    );
+    
+    const reactionData = {
+      id: result.rows[0].id,
+      messageId,
+      userId,
+      username: userInfo.rows[0].username,
+      emoji,
+      emojiName
+    };
+    
+    // Emit to socket
+    const io = req.app.get('io');
+    io.to(`message-${messageId}`).emit('new-reaction', reactionData);
+    
+    res.status(201).json(reactionData);
+  } catch (error) {
+    console.error('Add reaction error:', error);
+    res.status(500).json({ error: 'Failed to add reaction' });
+  }
+};
+
+// Get reactions for a message
+export const getReactions = async (req, res) => {
+  const { messageId } = req.params;
+  
+  try {
+    const result = await pool.query(
+      `SELECT r.*, u.username 
+       FROM message_reactions r
+       JOIN users u ON r.user_id = u.id
+       WHERE r.message_id = $1
+       ORDER BY r.created_at ASC`,
+      [messageId]
+    );
+    
+    const reactions = result.rows.map(row => ({
+      id: row.id,
+      messageId: row.message_id,
+      userId: row.user_id,
+      username: row.username,
+      emoji: row.emoji,
+      emojiName: row.emoji_name,
+      createdAt: row.created_at
+    }));
+    
+    res.status(200).json(reactions);
+  } catch (error) {
+    console.error('Get reactions error:', error);
+    res.status(500).json({ error: 'Failed to get reactions' });
   }
 };
