@@ -4,8 +4,11 @@ import io from 'socket.io-client';
 // Singleton pattern for socket management
 let socket = null;
 
-// Fix URL and ensure correct endpoints
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// Fix URL and ensure correct endpoints with production fallback
+const API_URL = process.env.REACT_APP_API_URL || 
+  (process.env.NODE_ENV === 'production' 
+    ? 'https://smiya.onrender.com/api' 
+    : 'http://localhost:5000/api');
 
 export const register = async (userData) => {
   try {

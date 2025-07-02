@@ -38,7 +38,10 @@ function Chat() {
   
   const messagesContainerRef = useRef(null);
   
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  const API_URL = process.env.REACT_APP_API_URL || 
+    (process.env.NODE_ENV === 'production' 
+      ? 'https://smiya.onrender.com/api' 
+      : 'http://localhost:5000/api');
   const MESSAGES_PER_PAGE = 20;
   
   // Add a preprocessMessage function to prepare media properly before rendering

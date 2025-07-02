@@ -62,7 +62,10 @@ function Register() {
       };
       
       // Show the full URL being used
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+      const apiUrl = process.env.REACT_APP_API_URL || 
+        (process.env.NODE_ENV === 'production' 
+          ? 'https://smiya.onrender.com/api' 
+          : 'http://localhost:5000/api');
       setDebugInfo(`Sending request to: ${apiUrl}/auth/register`);
       
       console.log('Registration data:', userData);
