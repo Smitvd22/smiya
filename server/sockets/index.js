@@ -223,6 +223,23 @@ export const setupSocketIO = (io) => {
         socket.to(socket.currentCallId).emit('user-left-video-call', socket.peerId);
       }
     });
+
+    // Add this with the other socket event handlers
+
+    // Handle call ending
+    socket.on('end-video-call', (callId) => {
+      console.log(`User ${socket.id} ended call ${callId}`);
+
+      // Notify all other peers in the room
+      socket.to(callId).emit('call-ended-by-peer');
+
+      // Clean up memberships, etc.
+      if (socket.currentCallId === callId) {
+        socket.leave(callId);
+        socket.currentCallId = null;
+        socket.peerId = null;
+      }
+    });
   });
 };
 

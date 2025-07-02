@@ -24,6 +24,10 @@ const VideoCall = () => {
   const [participants, setParticipants] = useState([]);
   const [isInitiator, setIsInitiator] = useState(false);
 
+  // Add these state variables to store user IDs
+  const [callerId, setCallerId] = useState(null);
+  const [receiverId, setReceiverId] = useState(null);
+
   // Refs
   const myVideo = useRef();
   const remoteVideo = useRef();
@@ -672,11 +676,32 @@ const VideoCall = () => {
         socket.on('user-left-video-call', handleUserLeft);
         socket.on('existing-participants', handleExistingParticipants);
 
+        // Listen for call ended by the other user
+        socket.on('call-ended-by-peer', () => {
+          console.log('Call ended by the other user');
+          
+          // Perform cleanup
+          cleanup(true);
+          
+          // Navigate to appropriate chat
+          if (callerId && receiverId) {
+            if (isInitiator) {
+              navigate(`/chat/${receiverId}`);
+            } else {
+              navigate(`/chat/${callerId}`);
+            }
+          } else {
+            // Fallback if IDs are missing
+            navigate(-1);
+          }
+        });
+
         // Store cleanup function
         peer.cleanupListeners = () => {
           socket.off('user-joined-video-call', handleUserJoined);
           socket.off('user-left-video-call', handleUserLeft);
           socket.off('existing-participants', handleExistingParticipants);
+          socket.off('call-ended-by-peer');
         };
 
         // Step 6: Join the video call room with proper peer ID
@@ -703,7 +728,7 @@ const VideoCall = () => {
     })();
 
     return initializationPromise.current;
-  }, [callId, getPeerJSConfig, handleCallEnd, getSocket, isInitiator, myPeerId, setParticipants, handleRetry]);
+  }, [callId, getPeerJSConfig, handleCallEnd, getSocket, isInitiator, myPeerId, setParticipants, handleRetry, callerId, cleanup, navigate, receiverId]);
 
   // 4. Set the ref to point to the actual function
   useEffect(() => {
@@ -898,8 +923,27 @@ const VideoCall = () => {
   };
 
   const endCall = () => {
+    // Send socket event to notify other user that call is ending
+    const socket = getSocket();
+    if (socket && callId) {
+      socket.emit('end-video-call', callId);
+    }
+    
     cleanup(true); // Pass true for full cleanup
-    navigate(-1);
+    
+    // If we have both IDs, redirect to the appropriate chat
+    if (callerId && receiverId) {
+      // If this user is the initiator, navigate to chat with receiver
+      if (isInitiator) {
+        navigate(`/chat/${receiverId}`);
+      } else {
+        // If this user is the receiver, navigate to chat with caller
+        navigate(`/chat/${callerId}`);
+      }
+    } else {
+      // Fallback to previous page if IDs are missing
+      navigate(-1);
+    }
   };
 
   // Increase timeout and add progressive retry
@@ -1002,6 +1046,17 @@ const VideoCall = () => {
         setIsInitiator(false);
         sessionStorage.setItem(storageKey, 'false');
         console.log('▶️ Default role: RECEIVER (no override from Chat, none in storage)');
+      }
+    }
+
+    // Extract user IDs from location state
+    if (location.state) {
+      // Store user IDs for redirection
+      if (location.state.fromUserId) {
+        setCallerId(location.state.fromUserId);
+      }
+      if (location.state.toUserId) {
+        setReceiverId(location.state.toUserId);
       }
     }
   }, [callId, location.state]);
