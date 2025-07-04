@@ -5,7 +5,6 @@ import { getCurrentUser } from '../services/authService';
 import { useCall } from '../contexts/CallContext';
 import MediaUpload from '../components/MediaUpload';
 import MediaDisplay from '../components/MediaDisplay';
-// Add emoji picker import
 import EmojiPicker from 'emoji-picker-react';
 import '../styles/Chat.css';
 
@@ -788,8 +787,32 @@ function Chat() {
     }, 2000);
   };
 
+  // Add new effect to handle mobile layout optimization
+  useEffect(() => {
+    // Hide navbar when on chat page
+    document.body.classList.add('chat-page-active');
+    
+    // Add viewport height fix for mobile
+    const setViewportHeight = () => {
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+    };
+    
+    // Set initial viewport height
+    setViewportHeight();
+    
+    // Update on resize
+    window.addEventListener('resize', setViewportHeight);
+    
+    // Cleanup when component unmounts
+    return () => {
+      document.body.classList.remove('chat-page-active');
+      window.removeEventListener('resize', setViewportHeight);
+    };
+  }, []);
+
   return (
-    <div className="chat-container">
+    <div className="chat-container chat-fullscreen">
       <div className="chat-header">
         <button className="back-button" onClick={() => navigate('/friends')}>
           ← Back
@@ -802,7 +825,6 @@ function Chat() {
           ) : 'Loading...'}
         </h2>
         
-        {/* Add video call button */}
         <div className="chat-actions">
           <button 
             onClick={startVideoCall} 
@@ -817,14 +839,7 @@ function Chat() {
       {error && <div className="error-message">{error}</div>}
       
       {showConnectionWarning && !socketConnected && (
-        <div className="connection-warning" style={{
-          backgroundColor: "#fff3cd", 
-          color: "#856404", 
-          padding: "8px 12px", 
-          borderRadius: "4px",
-          margin: "8px 0",
-          textAlign: "center"
-        }}>
+        <div className="connection-warning">
           ⚠️ Connection lost. Messages may not be delivered immediately.
         </div>
       )}
@@ -894,7 +909,7 @@ function Chat() {
         </div>
       )}
       
-      {/* Message form */}
+      {/* Message form with improved mobile support */}
       <form className="message-form" onSubmit={sendMessage}>
         <button 
           type="button" 

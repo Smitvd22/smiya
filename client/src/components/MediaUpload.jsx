@@ -87,14 +87,25 @@ const MediaUpload = ({ onUploadSuccess, onCancel }) => {
     setIsUploading(true);
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('upload_preset', process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET);
+    
+    const cloudName = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET;
+    
+    console.log("Cloud name:", cloudName);
+    console.log("Upload preset:", uploadPreset);
+    
+    // Check if Cloudinary credentials are available
+    if (!cloudName || !uploadPreset) {
+      console.error("Cloudinary credentials missing. Please check your environment variables.");
+      setIsUploading(false);
+      alert('Media upload configuration is missing. Please contact the administrator.');
+      return;
+    }
+    
+    formData.append('upload_preset', uploadPreset);
     formData.append('resource_type', 'auto');
     
-    console.log("Cloud name:", process.env.REACT_APP_CLOUDINARY_CLOUD_NAME);
-    console.log("Upload preset:", process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET);
-    
     try {
-      const cloudName = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME;
       const response = await axios.post(
         `https://api.cloudinary.com/v1_1/${cloudName}/upload`,
         formData

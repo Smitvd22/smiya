@@ -405,3 +405,154 @@
 .reply-context:hover {
   background-color: rgba(0, 0, 0, 0.1);
 }
+
+/* Mobile optimization for Chat page */
+
+/* Hide navbar when on chat page */
+body.chat-page-active .navbar {
+  display: none !important;
+}
+
+/* Use custom viewport height variable for better mobile support */
+:root {
+  --vh: 1vh;
+}
+
+/* Full screen chat container without navbar */
+.chat-container.chat-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 100vh; /* Fallback */
+  height: calc(var(--vh, 1vh) * 100);
+  margin: 0;
+  max-width: 100%;
+  z-index: 1000;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Adjust message container to use flex for better space management */
+.messages-container {
+  flex: 1;
+  height: auto;
+  max-height: none;
+}
+
+/* Optimize form for mobile keyboard */
+.message-form {
+  position: sticky;
+  bottom: 0;
+  padding: 8px;
+  background-color: white;
+  z-index: 10;
+}
+
+/* Make sure input is visible above keyboard */
+.message-form input {
+  padding: 10px;
+  font-size: 16px; /* Prevents iOS zoom on focus */
+}
+
+/* Simplify connection warning */
+.connection-warning {
+  background-color: #fff3cd;
+  color: #856404;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin: 8px 0;
+  text-align: center;
+  font-size: 14px;
+}
+
+/* Mobile specific adjustments */
+@media (max-width: 768px) {
+  .chat-header {
+    padding: 8px 10px;
+    height: auto;
+  }
+  
+  .chat-header h2 {
+    font-size: 1.2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .video-call-btn {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+  }
+  
+  .message {
+    max-width: 80%;
+    padding: 8px 12px;
+  }
+  
+  /* Ensure emoji picker doesn't overlap important content */
+  .emoji-picker-container {
+    position: fixed;
+    bottom: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-height: 40vh;
+  }
+}
+
+/* Fix for iOS Safari viewport issues */
+@supports (-webkit-touch-callout: none) {
+  .chat-container.chat-fullscreen {
+    height: -webkit-fill-available;
+  }
+}
+
+/* Updated styles for message reactions */
+.message-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  position: relative;
+  margin: 0;
+  z-index: 5;
+}
+
+.message.sent .message-reactions {
+  position: absolute;
+  bottom: -12px;
+  right: 10px;
+}
+
+.message.received .message-reactions {
+  position: absolute;
+  bottom: -12px;
+  left: 10px;
+}
+
+.reaction {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-right: 4px;
+  position: relative;
+  font-size: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.reaction:hover {
+  transform: scale(1.2);
+}
+
+/* Ensure message has correct positioning for absolute elements */
+.message {
+  position: relative;
+  margin-bottom: 18px; /* Extra space for reactions below */
+}
